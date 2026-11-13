@@ -59,6 +59,15 @@ struct ItemDetailView: View {
                     if let last = Garment.day(item.lastWorn) {
                         FactRow(title: "上次穿") { Text(last) }
                     }
+                    if let seasons = Garment.seasons(item.seasonTags) {
+                        FactRow(title: "季节") { Text(seasons) }
+                    }
+                    if let material = item.material, !material.isEmpty {
+                        FactRow(title: "材质") { Text(Garment.material(material)) }
+                    }
+                    if let formality = Garment.formality(item.formalityScore) {
+                        FactRow(title: "场合") { Text(formality) }
+                    }
                     FactRow(title: "现在") {
                         Menu {
                             Picker("现在", selection: statusBinding(item)) {

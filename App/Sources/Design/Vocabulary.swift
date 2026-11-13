@@ -63,6 +63,36 @@ enum Garment {
         }
     }
 
+    static func material(_ raw: String) -> String {
+        let known = [
+            "cotton": "棉", "wool": "羊毛", "denim": "牛仔", "leather": "皮革", "linen": "亚麻", "silk": "真丝",
+            "polyester": "聚酯纤维", "nylon": "尼龙", "cashmere": "羊绒", "down": "羽绒", "knit": "针织",
+        ]
+        return known[raw.lowercased()] ?? raw
+    }
+
+    /// "春 · 秋", or "四季" for `all_season`; nil when unknown.
+    static func seasons(_ tags: [String]?) -> String? {
+        guard let tags, !tags.isEmpty else { return nil }
+        if tags.contains("all_season") { return "四季" }
+        let names = ["spring": "春", "summer": "夏", "autumn": "秋", "fall": "秋", "winter": "冬"]
+        let labels = tags.compactMap { names[$0] }
+        return labels.isEmpty ? nil : labels.joined(separator: " · ")
+    }
+
+    /// Recognition scores formality 0…100 (10 sport … 90 formal). Smaller
+    /// values are the legacy 1…5 edit scale and are not shown.
+    static func formality(_ score: Int?) -> String? {
+        guard let score, score >= 10 else { return nil }
+        switch score {
+        case ..<20: return "运动"
+        case ..<40: return "休闲"
+        case ..<60: return "日常通勤"
+        case ..<80: return "商务"
+        default: return "正式"
+        }
+    }
+
     /// "2026-11-03" → "11月3日".
     static func day(_ raw: String?) -> String? {
         // A calendar date has no time zone: parse and print it in the same one (GMT).
