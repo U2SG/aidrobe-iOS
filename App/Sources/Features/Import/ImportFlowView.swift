@@ -164,7 +164,10 @@ private struct ConfirmImportView: View {
             Form {
                 ForEach($drafts) { $draft in
                     Section {
-                        if drafts.count > 1 {
+                        if draft.alreadyConfirmed {
+                            Label("已在衣橱中", systemImage: "checkmark.circle.fill")
+                                .foregroundStyle(Color.success)
+                        } else if drafts.count > 1 {
                             Toggle("导入这件", isOn: $draft.include)
                         }
                         AsyncImage(url: draft.imageURL) { image in
@@ -182,7 +185,7 @@ private struct ConfirmImportView: View {
                         }
                         TextField("主色", text: $draft.color)
                     }
-                    .disabled(!draft.include)
+                    .disabled(!draft.include || draft.alreadyConfirmed)
                 }
                 if failed {
                     Text("没能保存，请稍后再试").foregroundStyle(Color.danger)
