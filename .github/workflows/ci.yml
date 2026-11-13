@@ -35,3 +35,5 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - run: ./scripts/check-contracts.sh
+      - name: Generator input is up to date
+        run: python3 scripts/normalize-openapi.py --check

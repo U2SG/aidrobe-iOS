@@ -9,7 +9,7 @@ Plan and decisions: `docs/plans/2026-11-13-swiftui-rewrite-plan.md`.
 - Generate the Xcode project after changing `project.yml`: `xcodegen generate` (the generated `Aidrobe.xcodeproj` is committed so CI needs no generator).
 - Unit tests (business logic, no simulator): `cd Packages/AidrobeKit && swift test`
 - Build for simulator: `xcodebuild -project Aidrobe.xcodeproj -scheme Aidrobe -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/dd -skipPackagePluginValidation build` (Xcode GUI: trust the OpenAPIGenerator plugin once)
-- Contract drift check: `./scripts/check-contracts.sh`
+- Contract drift check: `./scripts/check-contracts.sh`; after re-copying `contracts/openapi.json` run `scripts/normalize-openapi.py` (rewrites FastAPI `anyOf [X, null]`, which the generator otherwise drops)
 
 Unlike the backend / RN repos, local build, unit tests and simulator runs are expected here; GitHub CI (`.github/workflows/ci.yml`, `macos-26`) is the merge gate. CI's default Xcode is 26.6 while local is 27.x — only use APIs available in the iOS 26 SDK.
 
