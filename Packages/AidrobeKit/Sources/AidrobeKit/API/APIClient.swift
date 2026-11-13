@@ -118,6 +118,9 @@ public actor APIClient {
         if let correlationID {
             request.setValue(correlationID, forHTTPHeaderField: "X-Correlation-Id")
         }
+        for (name, value) in endpoint.headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
 
         do {
             return try await transport.send(request)

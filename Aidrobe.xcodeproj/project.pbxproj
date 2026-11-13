@@ -8,14 +8,17 @@
 
 /* Begin PBXBuildFile section */
 		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
+		2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */; };
 		3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7287219AD96948E57CCA4CFD /* TodayModel.swift */; };
 		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
 		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
 		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
+		97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */; };
 		9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */; };
 		AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */; };
 		AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */; };
 		C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2559DA0C635E0639F94262 /* RootView.swift */; };
+		D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E636373E92357B9B4DA9EB71 /* ImportDemo.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -25,11 +28,14 @@
 		6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7287219AD96948E57CCA4CFD /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
 		A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
 		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
 		D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
 		D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		E636373E92357B9B4DA9EB71 /* ImportDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDemo.swift; sourceTree = "<group>"; };
 		EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowModel.swift; sourceTree = "<group>"; };
 		FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Aidrobe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -125,9 +131,20 @@
 			name = Products;
 			sourceTree = "<group>";
 		};
+		BDE05A2D1838802ED6CF6965 /* Import */ = {
+			isa = PBXGroup;
+			children = (
+				E636373E92357B9B4DA9EB71 /* ImportDemo.swift */,
+				F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */,
+				BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */,
+			);
+			path = Import;
+			sourceTree = "<group>";
+		};
 		CEA5C99BD51C2D7C6CA027DE /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				BDE05A2D1838802ED6CF6965 /* Import */,
 				3C540C76B732B6B4DCD759FA /* Profile */,
 				36845D461C029326607B574E /* Today */,
 			);
@@ -219,6 +236,9 @@
 			buildActionMask = 2147483647;
 			files = (
 				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
+				D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */,
+				2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */,
+				97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */,
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
 				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,

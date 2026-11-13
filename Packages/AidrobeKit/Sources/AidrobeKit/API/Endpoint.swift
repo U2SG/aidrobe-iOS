@@ -12,19 +12,23 @@ public struct Endpoint<Response: Decodable & Sendable>: Sendable {
     public var query: [URLQueryItem]
     public var body: Data?
     public var timeout: TimeInterval
+    /// Extra request headers (e.g. `Idempotency-Key`).
+    public var headers: [String: String]
 
     public init(
         _ method: HTTPMethod,
         _ path: String,
         query: [URLQueryItem] = [],
         body: Data? = nil,
-        timeout: TimeInterval = Endpoint.defaultTimeout
+        timeout: TimeInterval = Endpoint.defaultTimeout,
+        headers: [String: String] = [:]
     ) {
         self.method = method
         self.path = path
         self.query = query
         self.body = body
         self.timeout = timeout
+        self.headers = headers
     }
 
     /// JSON-encodes `payload` with snake_case keys.
@@ -33,9 +37,12 @@ public struct Endpoint<Response: Decodable & Sendable>: Sendable {
         _ path: String,
         json payload: some Encodable,
         query: [URLQueryItem] = [],
-        timeout: TimeInterval = Endpoint.defaultTimeout
+        timeout: TimeInterval = Endpoint.defaultTimeout,
+        headers: [String: String] = [:]
     ) throws {
-        self.init(method, path, query: query, body: try JSONCoding.encoder.encode(payload), timeout: timeout)
+        self.init(
+            method, path, query: query, body: try JSONCoding.encoder.encode(payload), timeout: timeout, headers: headers
+        )
     }
 
     public static var defaultTimeout: TimeInterval { 15 }
