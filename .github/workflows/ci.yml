@@ -26,6 +26,7 @@ jobs:
           xcodebuild build \
             -project Aidrobe.xcodeproj -scheme Aidrobe \
             -destination 'generic/platform=iOS Simulator' \
+            -skipPackagePluginValidation \
             CODE_SIGNING_ALLOWED=NO | tail -n 20
 
   contracts:

@@ -53,15 +53,42 @@ public struct EmptyResponse: Decodable, Sendable, Equatable {
 }
 
 public enum JSONCoding {
+    /// Generated wire models carry explicit snake_case `CodingKeys`, so no key
+    /// conversion. Dates accept ISO 8601 with or without fractional seconds
+    /// (Python emits microseconds).
     public static let decoder: JSONDecoder = {
         let decoder = JSONDecoder()
-        decoder.keyDecodingStrategy = .convertFromSnakeCase
+        decoder.dateDecodingStrategy = .custom { decoder in
+            let container = try decoder.singleValueContainer()
+            let raw = try container.decode(String.self)
+            if let date = parseDate(raw) { return date }
+            throw DecodingError.dataCorruptedError(in: container, debugDescription: "Unrecognised date: \(raw)")
+        }
         return decoder
     }()
 
     public static let encoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .convertToSnakeCase
+        encoder.dateEncodingStrategy = .iso8601
         return encoder
     }()
+
+    static func parseDate(_ raw: String) -> Date? {
+        var value = raw
+        // Trim sub-millisecond digits ("…:00.123456+00:00" → "…:00.123+00:00").
+        if let dot = value.firstIndex(of: ".") {
+            let digitsEnd = value[value.index(after: dot)...].firstIndex { !$0.isNumber } ?? value.endIndex
+            let digits = value[value.index(after: dot)..<digitsEnd]
+            if digits.count > 3 {
+                value.replaceSubrange(value.index(dot, offsetBy: 4)..<digitsEnd, with: "")
+            }
+        }
+        let withFraction = Date.ISO8601FormatStyle(includingFractionalSeconds: true)
+        let plain = Date.ISO8601FormatStyle()
+        return (try? withFraction.parse(value)) ?? (try? plain.parse(value))
+    }
 }
+
+/// Generated wire models (from contracts/openapi.json).
+public typealias Wire = Components.Schemas

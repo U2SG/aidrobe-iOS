@@ -8,10 +8,18 @@ let package = Package(
     products: [
         .library(name: "AidrobeKit", targets: ["AidrobeKit"]),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-openapi-generator", from: "1.10.0"),
+        .package(url: "https://github.com/apple/swift-openapi-runtime", from: "1.8.0"),
+    ],
     targets: [
+        // Wire models are generated from contracts/openapi.json (types only);
+        // transport, envelope handling and auth stay in APIClient.
         .target(
             name: "AidrobeKit",
-            swiftSettings: [.swiftLanguageMode(.v6)]
+            dependencies: [.product(name: "OpenAPIRuntime", package: "swift-openapi-runtime")],
+            swiftSettings: [.swiftLanguageMode(.v6)],
+            plugins: [.plugin(name: "OpenAPIGenerator", package: "swift-openapi-generator")]
         ),
         .testTarget(
             name: "AidrobeKitTests",

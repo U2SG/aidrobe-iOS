@@ -133,7 +133,7 @@ public actor APIClient {
         guard let refreshToken = session.refreshToken else { throw APIError.unauthorized(deactivated: false) }
 
         let task = Task<TokenPair, any Error> {
-            let endpoint = try Endpoint<AuthTokens>(.post, "/v1/auth/refresh", json: ["refresh_token": refreshToken])
+            let endpoint = try Endpoint<AuthTokens>(.post, "/v1/auth/refresh", json: Wire.RefreshTokenRequest(refreshToken: refreshToken))
             let (data, response) = try await perform(endpoint, accessToken: nil)
             let tokens = try Self.decode(AuthTokens.self, data: data, response: response)
             return TokenPair(accessToken: tokens.accessToken, refreshToken: tokens.refreshToken)
@@ -200,10 +200,4 @@ public actor APIClient {
 }
 
 /// `AuthTokenResponse` from `/v1/auth/*`.
-public struct AuthTokens: Decodable, Sendable, Equatable {
-    public var userId: String
-    public var accessToken: String
-    public var refreshToken: String
-    public var tokenType: String
-    public var expiresIn: Int
-}
+public typealias AuthTokens = Wire.AuthTokenResponse
