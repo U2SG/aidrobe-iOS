@@ -60,6 +60,7 @@ private struct TodayHeader: View {
 private struct TodayEmptyPage: View {
     let guidance: String?
     let reload: () async -> Void
+    @State private var isImporting = false
 
     var body: some View {
         ScrollView {
@@ -68,11 +69,18 @@ private struct TodayEmptyPage: View {
                 Text(guidance ?? "衣橱里至少要有一件上装、一件下装和一双鞋。先放进几件常穿的，明早就有搭配。")
                     .font(.body)
                     .foregroundStyle(Color.secondaryLabel)
+                Button("添加衣物") { isImporting = true }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .padding(.top, Spacing.tight)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)
         }
         .refreshable { await reload() }
+        .sheet(isPresented: $isImporting) {
+            ImportFlowView { Task { await reload() } }
+        }
     }
 }
 
@@ -97,8 +105,14 @@ private struct TodayPage: View {
     private var isWorn: Bool { model.wornOutfitIDs.contains(outfit.outfitId) }
 
     var body: some View {
+        // A refresh can come back empty; the parent swaps this page out, but
+        // never index into an empty list on the way.
+        if !model.outfits.isEmpty { page }
+    }
+
+    private var page: some View {
         @Bindable var model = model
-        ScrollView {
+        return ScrollView {
             VStack(alignment: .leading, spacing: 0) {
                 header
                     .padding(.horizontal, Spacing.screen)

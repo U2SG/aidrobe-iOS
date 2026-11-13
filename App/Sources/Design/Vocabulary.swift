@@ -65,8 +65,11 @@ enum Garment {
 
     /// "2026-11-03" → "11月3日".
     static func day(_ raw: String?) -> String? {
+        // A calendar date has no time zone: parse and print it in the same one (GMT).
         guard let raw, let date = try? Date.ISO8601FormatStyle().year().month().day().parse(raw) else { return nil }
-        return date.formatted(.dateTime.month().day().locale(Locale(identifier: "zh_CN")))
+        var style = Date.FormatStyle.dateTime.month().day().locale(Locale(identifier: "zh_CN"))
+        style.timeZone = .gmt
+        return date.formatted(style)
     }
 }
 

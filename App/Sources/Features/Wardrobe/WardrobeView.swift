@@ -8,6 +8,7 @@ struct WardrobeView: View {
     @State private var category: String?
     @State private var query = ""
     @State private var notice: String?
+    @State private var isImporting = false
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.control), count: 2)
 
@@ -51,11 +52,14 @@ struct WardrobeView: View {
                 }
             case .loaded:
                 if store.items.isEmpty {
-                    ContentUnavailableView(
-                        "衣橱还是空的",
-                        systemImage: "hanger",
-                        description: Text("放进一件上装、一件下装和一双鞋，就能搭出第一套。")
-                    )
+                    ContentUnavailableView {
+                        Label("衣橱还是空的", systemImage: "hanger")
+                    } description: {
+                        Text("放进一件上装、一件下装和一双鞋，就能搭出第一套。")
+                    } actions: {
+                        Button("添加衣物") { isImporting = true }
+                            .buttonStyle(.glassProminent)
+                    }
                 } else {
                     catalogue
                 }
@@ -65,6 +69,14 @@ struct WardrobeView: View {
         .background(Color.background)
         .navigationTitle("衣橱")
         .navigationDestination(for: String.self) { ItemDetailView(itemID: $0) }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("添加衣物", systemImage: "plus") { isImporting = true }
+            }
+        }
+        .sheet(isPresented: $isImporting) {
+            ImportFlowView { Task { await store.load() } }
+        }
         .toast($notice)
         .task { await store.load() }
     }

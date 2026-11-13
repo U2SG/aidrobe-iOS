@@ -42,7 +42,7 @@ final class TodayModel {
 
     private(set) var phase: Phase = .loading
     private(set) var today: Wire.TodayRecommendationResponse?
-    private(set) var wornOutfitIDs: Set<String>
+    private(set) var wornOutfitIDs: Set<String> = []
     private(set) var feedbackByOutfit: [String: FeedbackKind] = [:]
     private(set) var favoriteOutfitIDs: Set<String> = []
     private(set) var feedbackTags: [Wire.FeedbackTagResponse] = []
@@ -59,7 +59,6 @@ final class TodayModel {
     init(api: APIClient, wardrobe: WardrobeStore) {
         self.api = api
         self.wardrobe = wardrobe
-        wornOutfitIDs = wornLedger.todaysOutfits()
     }
 
     var outfits: [Wire.OutfitResponse] { today?.outfits ?? [] }
@@ -99,6 +98,7 @@ final class TodayModel {
 
     private func apply(_ today: Wire.TodayRecommendationResponse) {
         self.today = today
+        wornOutfitIDs = wornLedger.outfits(on: today.recommendationDate)
         favoriteOutfitIDs = Set(today.outfits?.filter { $0.isFavorited == true }.map(\.outfitId) ?? [])
     }
 
@@ -142,7 +142,7 @@ final class TodayModel {
                 try? await wardrobe.markWorn(item.itemID)
             }
             wornOutfitIDs.insert(outfit.outfitId)
-            wornLedger.record(outfit.outfitId)
+            if let day = today?.recommendationDate { wornLedger.record(outfit.outfitId, on: day) }
             await wardrobe.load()
         } catch {
             notice = userMessage(for: error)
@@ -172,19 +172,18 @@ final class TodayModel {
     }
 }
 
-/// Remembers which outfits were worn today so the page still says so after a
-/// relaunch (the recommendation payload doesn't).
+/// Remembers which outfits were worn on the current recommendation day so the
+/// page still says so after a relaunch (the recommendation payload doesn't).
+/// Keyed by the server's `recommendation_date`, never the device's idea of today.
 private struct WornLedger {
     private static let key = "aidrobe.today.worn"
 
-    private var day: String { Date.now.formatted(.iso8601.year().month().day()) }
-
-    func todaysOutfits() -> Set<String> {
+    func outfits(on day: String) -> Set<String> {
         let stored = UserDefaults.standard.dictionary(forKey: Self.key) as? [String: [String]]
         return Set(stored?[day] ?? [])
     }
 
-    func record(_ outfitID: String) {
-        UserDefaults.standard.set([day: Array(todaysOutfits().union([outfitID]))], forKey: Self.key)
+    func record(_ outfitID: String, on day: String) {
+        UserDefaults.standard.set([day: Array(outfits(on: day).union([outfitID]))], forKey: Self.key)
     }
 }

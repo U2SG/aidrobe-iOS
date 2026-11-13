@@ -20,7 +20,8 @@ final class ProfileModel {
 
     /// Days this month with a recorded outfit.
     var daysThisMonth: Int {
-        let month = Date.now.formatted(.iso8601.year().month())
+        let now = Calendar.current.dateComponents([.year, .month], from: .now)
+        let month = String(format: "%04d-%02d", now.year ?? 0, now.month ?? 0)
         return Set(history.map(\.wornDate).filter { $0.hasPrefix(month) }).count
     }
 

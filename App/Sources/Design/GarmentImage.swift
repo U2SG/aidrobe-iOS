@@ -20,6 +20,7 @@ actor GarmentImagePipeline {
 
     private let memory = NSCache<NSString, UIImage>()
     private var failedCutouts: Set<String> = []
+    private var lifting: [String: Task<UIImage?, Never>] = [:]
     private let directory: URL = {
         let base = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
         let directory = base.appending(path: "garment-cutouts", directoryHint: .isDirectory)
@@ -39,7 +40,12 @@ actor GarmentImagePipeline {
                 return GarmentRender(image: lifted, isCutout: true)
             }
             guard let original = await original(url, key: key) else { return nil }
-            if let lifted = await Self.liftSubject(from: original) {
+            // Several views ask for the same garment at once; lift it once.
+            let task = lifting[key] ?? Task { await Self.liftSubject(from: original) }
+            lifting[key] = task
+            let lifted = await task.value
+            lifting[key] = nil
+            if let lifted {
                 try? lifted.pngData()?.write(to: file, options: .atomic)
                 memory.setObject(lifted, forKey: "cutout:\(key)" as NSString)
                 return GarmentRender(image: lifted, isCutout: true)

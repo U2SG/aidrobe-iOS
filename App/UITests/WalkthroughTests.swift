@@ -54,6 +54,10 @@ final class WalkthroughTests: XCTestCase {
         settle(3)
         shot("08-item")
         app.navigationBars.buttons.firstMatch.tap()
+        app.buttons["添加衣物"].tap()
+        settle()
+        shot("08b-import")
+        app.buttons["完成"].tap()
 
         app.tabBars.buttons["我的"].tap()
         settle(3)
@@ -75,6 +79,21 @@ final class WalkthroughTests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         settle(3)
         shot("23-profile-dark")
+    }
+
+    /// Stores a weather location (dev data). Set one first:
+    /// `xcrun simctl location <device> set 31.23,121.47`.
+    func testUseCurrentLocation() {
+        launch(onboarded: true)
+        app.tabBars.buttons["我的"].tap()
+        app.buttons.matching(NSPredicate(format: "label CONTAINS '所在城市'")).firstMatch.tap()
+        let allow = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["使用App时允许"]
+        if allow.waitForExistence(timeout: 5) { allow.tap() }
+        settle(6)
+        shot("30-profile-location")
+        app.tabBars.buttons["今日"].tap()
+        settle(5)
+        shot("31-today-weather")
     }
 
     /// Records a wear, so it changes dev data; kept apart from the read-only walk.
