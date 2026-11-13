@@ -7,29 +7,58 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8587F1AAA07682D6879F836A /* TodaySheets.swift */; };
 		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
+		29EC67DC179F59663C9D73CD /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */; };
+		2AC23C889C751EF68082550A /* WalkthroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */; };
 		2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */; };
 		3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7287219AD96948E57CCA4CFD /* TodayModel.swift */; };
 		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
+		4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */; };
 		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
 		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
+		80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */; };
+		8130158784309756D1586D33 /* Vocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */; };
 		97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */; };
 		9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */; };
 		AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */; };
 		AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */; };
 		C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2559DA0C635E0639F94262 /* RootView.swift */; };
+		C2E4C587988D1E6B0781D099 /* GarmentImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F0A220DA8F46419E1AB257 /* GarmentImage.swift */; };
 		D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E636373E92357B9B4DA9EB71 /* ImportDemo.swift */; };
 		F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */; };
+		F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */; };
+		FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90100721EC7C17A012A33113 /* Components.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A5FF082058860D775AEC444B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 441C51941FDA6255DD49EEC9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FEF48C6BBB3B950490265696;
+			remoteInfo = Aidrobe;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectLiftLab.swift; sourceTree = "<group>"; };
+		3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AidrobeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileModel.swift; sourceTree = "<group>"; };
 		55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AidrobeKit; path = Packages/AidrobeKit; sourceTree = SOURCE_ROOT; };
 		6E2559DA0C635E0639F94262 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7287219AD96948E57CCA4CFD /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
+		7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkthroughTests.swift; sourceTree = "<group>"; };
+		8587F1AAA07682D6879F836A /* TodaySheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodaySheets.swift; sourceTree = "<group>"; };
+		862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		88F0A220DA8F46419E1AB257 /* GarmentImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarmentImage.swift; sourceTree = "<group>"; };
+		8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vocabulary.swift; sourceTree = "<group>"; };
+		8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WardrobeView.swift; sourceTree = "<group>"; };
+		90100721EC7C17A012A33113 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
 		A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WardrobeStore.swift; sourceTree = "<group>"; };
 		BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
 		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
@@ -73,10 +102,31 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		3288805770E3ED73583E1B50 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		34ECCCBBB537ADD9622653EF /* Wardrobe */ = {
+			isa = PBXGroup;
+			children = (
+				862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */,
+				BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */,
+				8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */,
+			);
+			path = Wardrobe;
+			sourceTree = "<group>";
+		};
 		35D25FD5C897AFBEE2F0E66E /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				90100721EC7C17A012A33113 /* Components.swift */,
+				88F0A220DA8F46419E1AB257 /* GarmentImage.swift */,
 				6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */,
+				8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */,
 			);
 			path = Design;
 			sourceTree = "<group>";
@@ -85,6 +135,7 @@
 			isa = PBXGroup;
 			children = (
 				7287219AD96948E57CCA4CFD /* TodayModel.swift */,
+				8587F1AAA07682D6879F836A /* TodaySheets.swift */,
 				D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */,
 			);
 			path = Today;
@@ -93,6 +144,7 @@
 		3C540C76B732B6B4DCD759FA /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */,
 				A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */,
 			);
 			path = Profile;
@@ -129,6 +181,7 @@
 			isa = PBXGroup;
 			children = (
 				FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */,
+				3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -150,6 +203,7 @@
 				BDE05A2D1838802ED6CF6965 /* Import */,
 				3C540C76B732B6B4DCD759FA /* Profile */,
 				36845D461C029326607B574E /* Today */,
+				34ECCCBBB537ADD9622653EF /* Wardrobe */,
 			);
 			path = Features;
 			sourceTree = "<group>";
@@ -159,6 +213,7 @@
 			children = (
 				1ECCBDDAA12E32D066B7279C /* Resources */,
 				3080515F67A589B3151C3878 /* Sources */,
+				3288805770E3ED73583E1B50 /* UITests */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -166,6 +221,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		07832FC76C5FC3EAA667B04B /* AidrobeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2952D7477DD459A056DC9AF3 /* Build configuration list for PBXNativeTarget "AidrobeUITests" */;
+			buildPhases = (
+				3CF0AFC4B471D2BAB1C5A38F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				48F2A2FA093B9D450456A528 /* PBXTargetDependency */,
+			);
+			name = AidrobeUITests;
+			packageProductDependencies = (
+			);
+			productName = AidrobeUITests;
+			productReference = 3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		FEF48C6BBB3B950490265696 /* Aidrobe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 65923982D18E91CF34AA3580 /* Build configuration list for PBXNativeTarget "Aidrobe" */;
@@ -195,6 +268,10 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					07832FC76C5FC3EAA667B04B = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = FEF48C6BBB3B950490265696;
+					};
 					FEF48C6BBB3B950490265696 = {
 						ProvisioningStyle = Automatic;
 					};
@@ -218,6 +295,7 @@
 			projectRoot = "";
 			targets = (
 				FEF48C6BBB3B950490265696 /* Aidrobe */,
+				07832FC76C5FC3EAA667B04B /* AidrobeUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -234,27 +312,87 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3CF0AFC4B471D2BAB1C5A38F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2AC23C889C751EF68082550A /* WalkthroughTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1D83A9A561603DAF97E365B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
+				FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */,
+				C2E4C587988D1E6B0781D099 /* GarmentImage.swift in Sources */,
 				D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */,
 				2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */,
 				97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */,
+				29EC67DC179F59663C9D73CD /* ItemDetailView.swift in Sources */,
+				4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */,
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
 				F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */,
 				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,
 				3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */,
+				07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */,
 				9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */,
+				8130158784309756D1586D33 /* Vocabulary.swift in Sources */,
+				F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */,
+				80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */,
 				AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		48F2A2FA093B9D450456A528 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FEF48C6BBB3B950490265696 /* Aidrobe */;
+			targetProxy = A5FF082058860D775AEC444B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		72FBF178B8274212D7DCCDC8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Aidrobe;
+			};
+			name = Release;
+		};
+		7974556C653C1BFA047765A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Aidrobe;
+			};
+			name = Debug;
+		};
 		7A27572D232597AC552A08EE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */;
@@ -429,6 +567,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2952D7477DD459A056DC9AF3 /* Build configuration list for PBXNativeTarget "AidrobeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7974556C653C1BFA047765A4 /* Debug */,
+				72FBF178B8274212D7DCCDC8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		5C7EF9DA5BCDE8E07D458603 /* Build configuration list for PBXProject "Aidrobe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

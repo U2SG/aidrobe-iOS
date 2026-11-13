@@ -2,6 +2,7 @@ import SwiftUI
 
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @AppStorage(Preferences.appearanceKey) private var appearance = "system"
 
     var body: some View {
         Group {
@@ -12,6 +13,7 @@ struct RootView: View {
             }
         }
         .animation(.default, value: model.onboardingCompleted)
+        .preferredColorScheme(Preferences.colorScheme(appearance))
     }
 }
 
@@ -22,24 +24,11 @@ struct MainTabView: View {
                 NavigationStack { TodayView() }
             }
             Tab("衣橱", systemImage: "hanger") {
-                NavigationStack { PlaceholderView(title: "衣橱") }
-            }
-            Tab("问问", systemImage: "sparkles") {
-                NavigationStack { PlaceholderView(title: "问问") }
+                NavigationStack { WardrobeView() }
             }
             Tab("我的", systemImage: "person") {
                 NavigationStack { ProfileView() }
             }
         }
-        .tabBarMinimizeBehavior(.onScrollDown)
-    }
-}
-
-struct PlaceholderView: View {
-    let title: String
-
-    var body: some View {
-        ContentUnavailableView(title, systemImage: "hammer", description: Text("即将推出"))
-            .navigationTitle(title)
     }
 }
