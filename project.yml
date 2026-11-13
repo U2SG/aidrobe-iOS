@@ -1,0 +1,67 @@
+name: Aidrobe
+options:
+  bundleIdPrefix: app.aidrobe
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "6.0"
+    SWIFT_STRICT_CONCURRENCY: complete
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+    TARGETED_DEVICE_FAMILY: "1"
+packages:
+  AidrobeKit:
+    path: Packages/AidrobeKit
+targets:
+  Aidrobe:
+    type: application
+    platform: iOS
+    sources:
+      - App/Sources
+      - App/Resources
+    dependencies:
+      - package: AidrobeKit
+    configFiles:
+      Debug: Config/Debug.xcconfig
+      Release: Config/Release.xcconfig
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.aidrobe.ios
+        PRODUCT_NAME: Aidrobe
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
+        GENERATE_INFOPLIST_FILE: YES
+        ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS: NO
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: App/Info.plist
+      properties:
+        CFBundleDisplayName: 衣然
+        UILaunchScreen:
+          UIColorName: Background
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        ITSAppUsesNonExemptEncryption: false
+        NSCameraUsageDescription: 拍摄衣物照片，导入你的衣橱。
+        NSPhotoLibraryUsageDescription: 从相册选择衣物或穿搭照片，导入你的衣橱。
+        NSPhotoLibraryAddUsageDescription: 保存搭配图片到相册。
+        NSLocationWhenInUseUsageDescription: 根据你所在城市的天气推荐今日穿搭。
+        NSAppTransportSecurity:
+          NSAllowsLocalNetworking: true
+        AIDROBE_APP_ENV: $(AIDROBE_APP_ENV)
+        AIDROBE_API_BASE_URL: $(AIDROBE_API_BASE_URL)
+        AIDROBE_DEV_USER_ID: $(AIDROBE_DEV_USER_ID)
+        AIDROBE_ENABLE_V3_PURCHASE_DECISION: $(AIDROBE_ENABLE_V3_PURCHASE_DECISION)
+        AIDROBE_ENABLE_V3_AVATAR: $(AIDROBE_ENABLE_V3_AVATAR)
+        AIDROBE_ENABLE_V3_STATIC_TRYON: $(AIDROBE_ENABLE_V3_STATIC_TRYON)
+        AIDROBE_ENABLE_V3_ANALYTICS: $(AIDROBE_ENABLE_V3_ANALYTICS)
+schemes:
+  Aidrobe:
+    build:
+      targets:
+        Aidrobe: all
+    test:
+      config: Debug
+      targets:
+        - package: AidrobeKit/AidrobeKitTests

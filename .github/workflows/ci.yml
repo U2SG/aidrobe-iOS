@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Unit tests & build
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v5
+      - name: Show toolchain
+        run: xcodebuild -version && swift --version
+      - name: AidrobeKit unit tests
+        working-directory: Packages/AidrobeKit
+        run: swift test
+      - name: Build app (simulator, unsigned)
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project Aidrobe.xcodeproj -scheme Aidrobe \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO | tail -n 20
+
+  contracts:
+    name: Contract snapshot matches backend
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - run: ./scripts/check-contracts.sh

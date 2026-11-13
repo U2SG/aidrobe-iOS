@@ -1,0 +1,439 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
+		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
+		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
+		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
+		9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */; };
+		AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */; };
+		AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */; };
+		C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2559DA0C635E0639F94262 /* RootView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AidrobeKit; path = Packages/AidrobeKit; sourceTree = SOURCE_ROOT; };
+		6E2559DA0C635E0639F94262 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
+		6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
+		D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
+		D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
+		EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Aidrobe.app; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		7A77BB767D95965D71D16231 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		1ECCBDDAA12E32D066B7279C /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		3080515F67A589B3151C3878 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */,
+				6E2559DA0C635E0639F94262 /* RootView.swift */,
+				D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */,
+				35D25FD5C897AFBEE2F0E66E /* Design */,
+				CEA5C99BD51C2D7C6CA027DE /* Features */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		35D25FD5C897AFBEE2F0E66E /* Design */ = {
+			isa = PBXGroup;
+			children = (
+				6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */,
+			);
+			path = Design;
+			sourceTree = "<group>";
+		};
+		36845D461C029326607B574E /* Today */ = {
+			isa = PBXGroup;
+			children = (
+				D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */,
+			);
+			path = Today;
+			sourceTree = "<group>";
+		};
+		3C540C76B732B6B4DCD759FA /* Profile */ = {
+			isa = PBXGroup;
+			children = (
+				A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */,
+			);
+			path = Profile;
+			sourceTree = "<group>";
+		};
+		49B1A008191E5A2C86AD4365 /* Config */ = {
+			isa = PBXGroup;
+			children = (
+				EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */,
+				4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */,
+			);
+			path = Config;
+			sourceTree = "<group>";
+		};
+		5EDD0917D6FD746E8CABBC6B = {
+			isa = PBXGroup;
+			children = (
+				FF3BA9829B4B7F7FB32E9F53 /* App */,
+				49B1A008191E5A2C86AD4365 /* Config */,
+				847022A35136A61A15F7EE41 /* Packages */,
+				8BAB3A6E7EE44EB2739ABEA5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		847022A35136A61A15F7EE41 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */,
+			);
+			path = Packages;
+			sourceTree = "<group>";
+		};
+		8BAB3A6E7EE44EB2739ABEA5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		CEA5C99BD51C2D7C6CA027DE /* Features */ = {
+			isa = PBXGroup;
+			children = (
+				3C540C76B732B6B4DCD759FA /* Profile */,
+				36845D461C029326607B574E /* Today */,
+			);
+			path = Features;
+			sourceTree = "<group>";
+		};
+		FF3BA9829B4B7F7FB32E9F53 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				1ECCBDDAA12E32D066B7279C /* Resources */,
+				3080515F67A589B3151C3878 /* Sources */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		FEF48C6BBB3B950490265696 /* Aidrobe */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 65923982D18E91CF34AA3580 /* Build configuration list for PBXNativeTarget "Aidrobe" */;
+			buildPhases = (
+				A1D83A9A561603DAF97E365B /* Sources */,
+				C851F97DFB0955FB117087AC /* Resources */,
+				7A77BB767D95965D71D16231 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = Aidrobe;
+			packageProductDependencies = (
+				0730BC3AB439776772100C62 /* AidrobeKit */,
+			);
+			productName = Aidrobe;
+			productReference = FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		441C51941FDA6255DD49EEC9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					FEF48C6BBB3B950490265696 = {
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = 5C7EF9DA5BCDE8E07D458603 /* Build configuration list for PBXProject "Aidrobe" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 5EDD0917D6FD746E8CABBC6B;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				9E10AAA7551EEF20EBE67B2D /* XCLocalSwiftPackageReference "Packages/AidrobeKit" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 8BAB3A6E7EE44EB2739ABEA5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				FEF48C6BBB3B950490265696 /* Aidrobe */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		C851F97DFB0955FB117087AC /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		A1D83A9A561603DAF97E365B /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
+				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
+				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
+				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,
+				9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */,
+				AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		7A27572D232597AC552A08EE /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios;
+				PRODUCT_NAME = Aidrobe;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		A1861D08AC27776716D2FB6A /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Release;
+		};
+		B214F3322098D6029769C99A /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				CURRENT_PROJECT_VERSION = 1;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+				MARKETING_VERSION = 0.1.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				TARGETED_DEVICE_FAMILY = 1;
+			};
+			name = Debug;
+		};
+		CE93ACD75A84E5BCA78309EB /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = NO;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = App/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios;
+				PRODUCT_NAME = Aidrobe;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		5C7EF9DA5BCDE8E07D458603 /* Build configuration list for PBXProject "Aidrobe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				B214F3322098D6029769C99A /* Debug */,
+				A1861D08AC27776716D2FB6A /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		65923982D18E91CF34AA3580 /* Build configuration list for PBXNativeTarget "Aidrobe" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7A27572D232597AC552A08EE /* Debug */,
+				CE93ACD75A84E5BCA78309EB /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		9E10AAA7551EEF20EBE67B2D /* XCLocalSwiftPackageReference "Packages/AidrobeKit" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/AidrobeKit;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		0730BC3AB439776772100C62 /* AidrobeKit */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AidrobeKit;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = 441C51941FDA6255DD49EEC9 /* Project object */;
+}
