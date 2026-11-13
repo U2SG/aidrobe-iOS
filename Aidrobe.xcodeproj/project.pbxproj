@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
+		3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7287219AD96948E57CCA4CFD /* TodayModel.swift */; };
 		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
 		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
 		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
@@ -22,6 +23,7 @@
 		55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AidrobeKit; path = Packages/AidrobeKit; sourceTree = SOURCE_ROOT; };
 		6E2559DA0C635E0639F94262 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
+		7287219AD96948E57CCA4CFD /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
 		A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
 		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
@@ -74,6 +76,7 @@
 		36845D461C029326607B574E /* Today */ = {
 			isa = PBXGroup;
 			children = (
+				7287219AD96948E57CCA4CFD /* TodayModel.swift */,
 				D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */,
 			);
 			path = Today;
@@ -219,6 +222,7 @@
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
 				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,
+				3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */,
 				9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */,
 				AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */,
 			);
