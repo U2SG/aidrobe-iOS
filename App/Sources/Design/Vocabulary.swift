@@ -63,20 +63,29 @@ enum Garment {
         }
     }
 
+    static let materials: [(key: String, label: String)] = [
+        ("cotton", "棉"), ("wool", "羊毛"), ("cashmere", "羊绒"), ("linen", "亚麻"), ("silk", "真丝"),
+        ("denim", "牛仔"), ("leather", "皮革"), ("polyester", "聚酯纤维"), ("nylon", "尼龙"), ("down", "羽绒"),
+    ]
+
     static func material(_ raw: String) -> String {
-        let known = [
-            "cotton": "棉", "wool": "羊毛", "denim": "牛仔", "leather": "皮革", "linen": "亚麻", "silk": "真丝",
-            "polyester": "聚酯纤维", "nylon": "尼龙", "cashmere": "羊绒", "down": "羽绒", "knit": "针织",
-        ]
-        return known[raw.lowercased()] ?? raw
+        materials.first { $0.key == raw.lowercased() }?.label ?? raw
     }
+
+    static let seasonOptions: [(key: String, label: String)] = [
+        ("spring", "春"), ("summer", "夏"), ("autumn", "秋"), ("winter", "冬"), ("all_season", "四季"),
+    ]
+
+    /// The backend's recognition scale: 10 sport, 30 casual, 50 smart casual, 70 business, 90 formal.
+    static let formalityOptions: [(score: Int, label: String)] = [
+        (10, "运动"), (30, "休闲"), (50, "日常通勤"), (70, "商务"), (90, "正式"),
+    ]
 
     /// "春 · 秋", or "四季" for `all_season`; nil when unknown.
     static func seasons(_ tags: [String]?) -> String? {
         guard let tags, !tags.isEmpty else { return nil }
         if tags.contains("all_season") { return "四季" }
-        let names = ["spring": "春", "summer": "夏", "autumn": "秋", "fall": "秋", "winter": "冬"]
-        let labels = tags.compactMap { names[$0] }
+        let labels = seasonOptions.filter { tags.contains($0.key) }.map(\.label)
         return labels.isEmpty ? nil : labels.joined(separator: " · ")
     }
 
@@ -84,13 +93,7 @@ enum Garment {
     /// values are the legacy 1…5 edit scale and are not shown.
     static func formality(_ score: Int?) -> String? {
         guard let score, score >= 10 else { return nil }
-        switch score {
-        case ..<20: return "运动"
-        case ..<40: return "休闲"
-        case ..<60: return "日常通勤"
-        case ..<80: return "商务"
-        default: return "正式"
-        }
+        return formalityOptions.last { $0.score - 10 <= score }?.label
     }
 
     /// "2026-11-03" → "11月3日".

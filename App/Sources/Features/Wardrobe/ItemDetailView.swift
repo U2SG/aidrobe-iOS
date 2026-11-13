@@ -104,7 +104,7 @@ struct ItemDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("更多", systemImage: "ellipsis") {
-                    Button("改名称和分类", systemImage: "pencil") { isEditing = true }
+                    Button("修改", systemImage: "pencil") { isEditing = true }
                     Button("从衣橱移除", systemImage: "trash", role: .destructive) { confirmsDelete = true }
                 }
             }
@@ -168,6 +168,9 @@ private struct ItemEditSheet: View {
     @State private var name: String
     @State private var category: String
     @State private var color: String
+    @State private var material: String
+    @State private var seasons: Set<String>
+    @State private var formality: Int
     @State private var failure: String?
 
     init(item: Wire.WardrobeItemResponse) {
@@ -175,6 +178,10 @@ private struct ItemEditSheet: View {
         _name = State(initialValue: item.displayName)
         _category = State(initialValue: item.category)
         _color = State(initialValue: item.colorMain.lowercased())
+        _material = State(initialValue: item.material?.lowercased() ?? "")
+        _seasons = State(initialValue: Set(item.seasonTags ?? []))
+        // Snap a recognised score onto the nearest option; 0 = not recorded.
+        _formality = State(initialValue: Garment.formalityOptions.last { $0.score - 10 <= (item.formalityScore ?? 0) }?.score ?? 0)
     }
 
     var body: some View {
@@ -191,8 +198,35 @@ private struct ItemEditSheet: View {
                         if Garment.swatch(color) == nil { Text(color).tag(color) }
                         ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
                     }
+                }
+                Section {
+                    Picker("材质", selection: $material) {
+                        if !Garment.materials.contains(where: { $0.key == material }) {
+                            Text(material.isEmpty ? "没记录" : material).tag(material)
+                        }
+                        ForEach(Garment.materials, id: \.key) { Text($0.label).tag($0.key) }
+                    }
+                    Picker("场合", selection: $formality) {
+                        if formality == 0 { Text("没记录").tag(0) }
+                        ForEach(Garment.formalityOptions, id: \.score) { Text($0.label).tag($0.score) }
+                    }
+                    VStack(alignment: .leading, spacing: Spacing.control) {
+                        Text("季节")
+                        FlowLayout {
+                            ForEach(Garment.seasonOptions, id: \.key) { option in
+                                Chip(title: option.label, isSelected: seasons.contains(option.key)) {
+                                    toggleSeason(option.key)
+                                }
+                            }
+                        }
+                    }
+                    .padding(.vertical, 4)
                 } footer: {
-                    if let failure { Text(failure).foregroundStyle(Color.danger) }
+                    if let failure {
+                        Text(failure).foregroundStyle(Color.danger)
+                    } else {
+                        Text("搭配会按季节和场合挑选，你改过的内容不会再被识别结果覆盖。")
+                    }
                 }
             }
             .scrollContentBackground(.hidden)
@@ -208,9 +242,14 @@ private struct ItemEditSheet: View {
                         Task {
                             do {
                                 let title = name.trimmingCharacters(in: .whitespaces)
-                                try await app.wardrobe.update(
-                                    item.itemId, .init(title: title, category: category, colorMain: color)
-                                )
+                                try await app.wardrobe.update(item.itemId, .init(
+                                    title: title,
+                                    category: category,
+                                    colorMain: color,
+                                    material: material.isEmpty ? nil : material,
+                                    seasonTags: Garment.seasonOptions.map(\.key).filter(seasons.contains),
+                                    formalityScore: formality == 0 ? nil : formality
+                                ))
                                 dismiss()
                             } catch {
                                 failure = userMessage(for: error)
@@ -221,6 +260,18 @@ private struct ItemEditSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
+        .presentationDetents([.large])
+    }
+
+    /// "All year" and the individual seasons exclude each other.
+    private func toggleSeason(_ key: String) {
+        if seasons.contains(key) {
+            seasons.remove(key)
+        } else if key == "all_season" {
+            seasons = [key]
+        } else {
+            seasons.remove("all_season")
+            seasons.insert(key)
+        }
     }
 }

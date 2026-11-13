@@ -55,6 +55,36 @@ WARDROBE = [
 ]
 
 
+# title -> (material, season_tags, formality_score 0..100), as recognition would fill them.
+ATTRIBUTES = {
+    "白色圆领 T 恤": ("cotton", ["spring", "summer", "autumn"], 30),
+    "藏青条纹衫": ("cotton", ["spring", "autumn"], 30),
+    "燕麦色针织衫": ("wool", ["autumn", "winter"], 50),
+    "浅蓝牛津衬衫": ("cotton", ["all_season"], 70),
+    "黑色高领打底": ("wool", ["autumn", "winter"], 50),
+    "原色直筒牛仔裤": ("denim", ["all_season"], 30),
+    "卡其直筒裤": ("cotton", ["spring", "autumn"], 50),
+    "黑色西裤": ("wool", ["all_season"], 90),
+    "灰色阔腿裤": ("polyester", ["all_season"], 70),
+    "驼色羊毛大衣": ("wool", ["winter"], 70),
+    "藏青西装外套": ("wool", ["spring", "autumn"], 90),
+    "橄榄绿工装夹克": ("cotton", ["spring", "autumn"], 30),
+    "黑色连衣裙": ("polyester", ["spring", "summer"], 70),
+    "白色运动鞋": ("leather", ["all_season"], 10),
+    "棕色乐福鞋": ("leather", ["all_season"], 70),
+    "黑色短靴": ("leather", ["autumn", "winter"], 50),
+}
+
+
+def set_attributes(item_id: str, title: str) -> None:
+    material, seasons, formality = ATTRIBUTES[title]
+    call(
+        "PATCH",
+        f"/v1/wardrobe-items/{item_id}",
+        {"material": material, "season_tags": seasons, "formality_score": formality},
+    )
+
+
 def details(kind: str, fill: str) -> str:
     dark = "#000" if fill > "#7" else "#fff"
     line = f'stroke="{dark}" stroke-opacity="0.22" stroke-width="3" fill="none"'
@@ -140,7 +170,11 @@ def main() -> None:
     if "--reset" in sys.argv:
         for item in call("GET", "/v1/wardrobe-items?limit=100")["items"]:
             call("DELETE", f"/v1/wardrobe-items/{item['item_id']}")
-    existing = {item["title"] for item in call("GET", "/v1/wardrobe-items?limit=100")["items"]}
+    current = call("GET", "/v1/wardrobe-items?limit=100")["items"]
+    existing = {item["title"] for item in current}
+    for item in current:  # wardrobes seeded before attributes existed
+        if item["title"] in ATTRIBUTES and item.get("formality_score") is None:
+            set_attributes(item["item_id"], item["title"])
     with tempfile.TemporaryDirectory() as raw:
         work = Path(raw)
         for title, category, color, fill, shape, kind in WARDROBE:
@@ -163,7 +197,10 @@ def main() -> None:
                 time.sleep(1)
             if status != "waiting_confirm":
                 sys.exit(f"import of {title} ended in {status}")
-            call("POST", f"/v1/import-tasks/{task}/confirm", {"title": title, "category": category, "color_main": color})
+            created = call(
+                "POST", f"/v1/import-tasks/{task}/confirm", {"title": title, "category": category, "color_main": color}
+            )
+            set_attributes(created["item_id"], title)
             print("imported", title)
 
 
