@@ -6818,6 +6818,28 @@
       "type": "boolean",
       "title": "Should Import"
      },
+     "formality_score": {
+      "type": "integer",
+      "title": "Formality Score"
+     },
+     "season_tags": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Season Tags"
+     },
+     "material": {
+      "type": "string",
+      "title": "Material"
+     },
+     "style_tags": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Style Tags"
+     },
      "confirmed_item_id": {
       "type": "string",
       "format": "uuid",
