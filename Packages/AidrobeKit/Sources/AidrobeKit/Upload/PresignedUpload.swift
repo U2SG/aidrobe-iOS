@@ -10,19 +10,6 @@ public struct PresignedUpload: Sendable, Equatable {
     public var fields: [String: String]
 }
 
-struct PresignRequest: Encodable {
-    var fileName: String
-    var contentType: String
-    var maxContentLength: Int?
-}
-
-struct PresignResponse: Decodable, Sendable {
-    var uploadUrl: String
-    var fileUrl: String
-    var objectKey: String
-    var fields: [String: String]?
-}
-
 public enum UploadError: Error, Sendable, Equatable {
     case invalidPresign
     case uploadFailed(status: Int)
@@ -45,10 +32,12 @@ public struct PresignedUploader: Sendable {
 
     /// Uploads JPEG/PNG bytes and returns the presign (use `objectKey` / `fileURL`).
     public func upload(_ data: Data, fileName: String, contentType: String) async throws -> PresignedUpload {
-        let endpoint = try Endpoint<PresignResponse>(
+        let endpoint = try Endpoint<Wire.PresignUploadResponse>(
             .post,
             "/v1/uploads/presign",
-            json: PresignRequest(fileName: fileName, contentType: contentType, maxContentLength: Self.maxContentLength)
+            json: Wire.PresignUploadRequest(
+                fileName: fileName, contentType: contentType, maxContentLength: Self.maxContentLength
+            )
         )
         let presign = try Self.makeUpload(from: await api.send(endpoint))
 
@@ -72,7 +61,7 @@ public struct PresignedUploader: Sendable {
         return presign
     }
 
-    static func makeUpload(from response: PresignResponse) throws -> PresignedUpload {
+    static func makeUpload(from response: Wire.PresignUploadResponse) throws -> PresignedUpload {
         guard let upload = URL(string: response.uploadUrl), let file = URL(string: response.fileUrl) else {
             throw UploadError.invalidPresign
         }
@@ -80,7 +69,7 @@ public struct PresignedUploader: Sendable {
             uploadURL: normalize(uploadURL: upload, publicURL: file),
             fileURL: file,
             objectKey: response.objectKey,
-            fields: response.fields ?? [:]
+            fields: response.fields?.additionalProperties ?? [:]
         )
     }
 

@@ -8,14 +8,14 @@ Plan and decisions: `docs/plans/2026-11-13-swiftui-rewrite-plan.md`.
 
 - Generate the Xcode project after changing `project.yml`: `xcodegen generate` (the generated `Aidrobe.xcodeproj` is committed so CI needs no generator).
 - Unit tests (business logic, no simulator): `cd Packages/AidrobeKit && swift test`
-- Build for simulator: `xcodebuild -project Aidrobe.xcodeproj -scheme Aidrobe -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/dd build`
+- Build for simulator: `xcodebuild -project Aidrobe.xcodeproj -scheme Aidrobe -destination 'platform=iOS Simulator,name=iPhone 17' -derivedDataPath .build/dd -skipPackagePluginValidation build` (Xcode GUI: trust the OpenAPIGenerator plugin once)
 - Contract drift check: `./scripts/check-contracts.sh`
 
 Unlike the backend / RN repos, local build, unit tests and simulator runs are expected here; GitHub CI (`.github/workflows/ci.yml`, `macos-26`) is the merge gate. CI's default Xcode is 26.6 while local is 27.x — only use APIs available in the iOS 26 SDK.
 
 ## Layout
 
-- `Packages/AidrobeKit` — UI-free logic: `Core` (environment, flags, Keychain, tokens), `API` (envelope-aware client, single-flight refresh, typed `Endpoint`), `Upload` (presign + host rewrite + compression). Everything here is unit tested.
+- `Packages/AidrobeKit` — UI-free logic: `Core` (environment, flags, Keychain, tokens), `API` (envelope-aware client, single-flight refresh, typed `Endpoint`; wire models are generated from `contracts/openapi.json` as `Wire.*` = `Components.Schemas.*`, types only — never hand-write a model the spec already has), `Upload` (presign + host rewrite + compression). Everything here is unit tested.
 - `App/Sources` — SwiftUI only. `Features/<Area>` per tab/flow, `Design/Theme.swift` for tokens.
 - `App/Resources/Assets.xcassets` — brand colours with light + dark variants (light values mirror RN `src/theme/design.ts`).
 - `Config/*.xcconfig` — per-configuration `AIDROBE_*` values surfaced through Info.plist and read by `AppEnvironment`.

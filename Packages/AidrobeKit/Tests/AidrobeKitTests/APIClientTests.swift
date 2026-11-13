@@ -31,6 +31,7 @@ final class EventRecorder: @unchecked Sendable {
 
 struct Item: Decodable, Sendable, Equatable {
     var itemId: String
+    enum CodingKeys: String, CodingKey { case itemId = "item_id" }
 }
 
 private let env = AppEnvironment(stage: .development, apiBaseURL: URL(string: "http://api.test")!, devUserID: "dev-1")
@@ -193,5 +194,26 @@ private func makeClient(
             try await client.send(Endpoint<Item>(.get, "/v1/x"))
         }
         #expect(transport.requests.count == 1)
+    }
+}
+
+@Suite struct WireDecodingTests {
+    @Test func decodesGeneratedModelThroughEnvelope() async throws {
+        let body = #"{"code":0,"message":"ok","data":{"user_id":"u","access_token":"A","refresh_token":"R","token_type":"bearer","expires_in":60}}"#
+        let (client, _, _) = makeClient { _ in (200, body) }
+        let tokens = try await client.send(Endpoint<AuthTokens>(.post, "/v1/auth/login/apple"))
+        #expect(tokens.accessToken == "A")
+        #expect(tokens.expiresIn == 60)
+    }
+
+    @Test(arguments: [
+        "2026-11-13T10:00:00Z",
+        "2026-11-13T10:00:00.123Z",
+        "2026-11-13T10:00:00.123456+00:00",
+        "2026-11-13T18:00:00+08:00",
+    ])
+    func parsesBackendDates(raw: String) throws {
+        let date = try #require(JSONCoding.parseDate(raw))
+        #expect(abs(date.timeIntervalSince1970 - 1_794_564_000) < 1)
     }
 }
