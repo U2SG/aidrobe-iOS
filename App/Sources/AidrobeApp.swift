@@ -8,6 +8,9 @@ struct AidrobeApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                #if DEBUG
+                .importDemo()
+                #endif
                 .environment(model)
                 .tint(Color.accent)
         }
