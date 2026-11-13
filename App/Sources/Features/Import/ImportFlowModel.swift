@@ -140,7 +140,7 @@ final class ImportFlowModel {
                 category: candidate.category,
                 color: candidate.colorMain,
                 imageURL: URL(string: candidate.cropImageUrl ?? candidate.originalImageUrl),
-                alreadyConfirmed: false
+                alreadyConfirmed: candidate.confirmedItemId != nil
             )
         }
     }
@@ -165,8 +165,10 @@ final class ImportFlowModel {
                         tempItemId: tempID, title: draft.title, category: draft.category, colorMain: draft.color
                     )
                 }
+                // The form lists every candidate, so an unchecked one is a
+                // deliberate "not this": close the task instead of leaving it open.
                 _ = try await api.send(Endpoints.confirmImportItems(
-                    taskID: task.taskId, Wire.ConfirmItemsRequest(items: items)
+                    taskID: task.taskId, Wire.ConfirmItemsRequest(items: items, dismissRemaining: true)
                 ))
             }
             forget(task.taskId)
