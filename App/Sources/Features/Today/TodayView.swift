@@ -280,10 +280,29 @@ private struct TodayPage: View {
     }
 
     @ViewBuilder private var reasons: some View {
-        if let reasoning = outfit.reasoning, !reasoning.isEmpty {
+        let reasoning = outfit.reasoning ?? []
+        // What the user told us earlier and how it changed this outfit comes
+        // first and reads differently: it is the app keeping its promise.
+        let remembered = reasoning.filter { $0._type == "feedback" }
+        let others = reasoning.filter { $0._type != "feedback" }.prefix(3)
+        if !reasoning.isEmpty {
             VStack(alignment: .leading, spacing: Spacing.control) {
                 SectionHeading(title: "为什么是这套")
-                ForEach(Array(reasoning.prefix(3).enumerated()), id: \.offset) { index, reason in
+                ForEach(Array(remembered.enumerated()), id: \.offset) { _, reason in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("记得你说过")
+                            .font(.caption.weight(.medium))
+                            .kerning(1.5)
+                            .foregroundStyle(Color.accent)
+                        Text(reason.text)
+                            .font(.body)
+                            .foregroundStyle(Color.label)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.row)
+                    .background(Color.accentSoft, in: .rect(cornerRadius: Radius.tile))
+                }
+                ForEach(Array(others.enumerated()), id: \.offset) { index, reason in
                     HStack(alignment: .firstTextBaseline, spacing: Spacing.control) {
                         Text("0\(index + 1)")
                             .font(.display(15, weight: .regular, relativeTo: .subheadline))
