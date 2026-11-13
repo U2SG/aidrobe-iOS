@@ -11065,22 +11065,33 @@
      },
      "season_tags": {
       "items": {
-       "type": "string"
+       "type": "string",
+       "enum": [
+        "spring",
+        "summer",
+        "autumn",
+        "winter",
+        "all_season"
+       ]
       },
       "type": "array",
+      "maxItems": 5,
       "title": "Season Tags"
      },
      "style_tags": {
       "items": {
-       "type": "string"
+       "type": "string",
+       "maxLength": 24,
+       "minLength": 1
       },
       "type": "array",
+      "maxItems": 8,
       "title": "Style Tags"
      },
      "formality_score": {
       "type": "integer",
-      "maximum": 5.0,
-      "minimum": 1.0,
+      "maximum": 100.0,
+      "minimum": 0.0,
       "title": "Formality Score"
      },
      "time_cost_level": {
