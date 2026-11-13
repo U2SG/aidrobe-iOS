@@ -24,6 +24,6 @@ struct ImportDemoModifier: ViewModifier {
 }
 
 extension View {
-    func importDemo() -> some View { modifier(ImportDemoModifier()) }
+    func importDemo() -> some View { modifier(ImportDemoModifier()).modifier(SubjectLiftLabModifier()) }
 }
 #endif

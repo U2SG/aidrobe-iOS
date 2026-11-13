@@ -19,9 +19,11 @@
 		AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */; };
 		C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2559DA0C635E0639F94262 /* RootView.swift */; };
 		D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E636373E92357B9B4DA9EB71 /* ImportDemo.swift */; };
+		F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectLiftLab.swift; sourceTree = "<group>"; };
 		4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AidrobeKit; path = Packages/AidrobeKit; sourceTree = SOURCE_ROOT; };
 		6E2559DA0C635E0639F94262 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
@@ -137,6 +139,7 @@
 				E636373E92357B9B4DA9EB71 /* ImportDemo.swift */,
 				F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */,
 				BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */,
+				01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */,
 			);
 			path = Import;
 			sourceTree = "<group>";
@@ -241,6 +244,7 @@
 				97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */,
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
+				F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */,
 				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,
 				3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */,
 				9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */,
