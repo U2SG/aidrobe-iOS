@@ -1,8 +1,7 @@
-import CoreImage
+import AidrobeKit
 import CryptoKit
 import SwiftUI
 import UIKit
-import Vision
 
 /// A garment picture ready to draw. `isCutout` means the background is gone, so
 /// the piece can sit straight on the page instead of inside a photo tile.
@@ -79,20 +78,13 @@ actor GarmentImagePipeline {
         return UIImage(cgImage: image)
     }
 
-    /// Foreground subject on a transparent background, cropped to its extent.
-    /// Nil when Vision finds no subject (or can't run, as on some simulators).
+    /// The garment lifted off its background, or nil when Vision finds nothing
+    /// usable: no subject, a speck, or a "subject" that is the whole frame.
+    /// A pair of shoes is two instances, so instance count is not a criterion.
     private static func liftSubject(from image: UIImage) async -> UIImage? {
-        guard let source = image.cgImage else { return nil }
-        let request = VNGenerateForegroundInstanceMaskRequest()
-        let handler = VNImageRequestHandler(cgImage: source)
-        guard (try? handler.perform([request])) != nil,
-              let observation = request.results?.first,
-              let buffer = try? observation.generateMaskedImage(
-                  ofInstances: observation.allInstances, from: handler, croppedToInstancesExtent: true
-              ) else { return nil }
-        let lifted = CIImage(cvPixelBuffer: buffer)
-        guard let output = CIContext().createCGImage(lifted, from: lifted.extent) else { return nil }
-        return UIImage(cgImage: output)
+        guard let source = image.cgImage, let lift = try? await SubjectLift.lift(source),
+              lift.coverage > 0.03, lift.coverage < 0.9 else { return nil }
+        return UIImage(cgImage: lift.image)
     }
 }
 
