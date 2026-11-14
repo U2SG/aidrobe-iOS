@@ -408,20 +408,8 @@ struct OutfitBoard: View {
         GeometryReader { proxy in
             let frames = OutfitBoardLayout.frames(for: items.map(\.role))
             ZStack(alignment: .topLeading) {
-                ForEach(Array(zip(items, frames)), id: \.0.id) { item, frame in
-                    Button {
-                        onTap?(item)
-                    } label: {
-                        GarmentImage(url: item.imageURL)
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(onTap == nil)
-                    .frame(
-                        width: max(0, proxy.size.width * frame.width - gap),
-                        height: max(0, proxy.size.height * frame.height - gap)
-                    )
-                    .offset(x: proxy.size.width * frame.x + gap / 2, y: proxy.size.height * frame.y + gap / 2)
-                    .accessibilityLabel("\(Garment.category(item.role))，\(item.name)")
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    tile(item, in: rect(frames[index], in: proxy.size))
                 }
             }
         }
@@ -429,5 +417,27 @@ struct OutfitBoard: View {
         .aspectRatio(0.86, contentMode: .fit)
         .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
         .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
+    }
+
+    /// A unit-square frame scaled to the board, inset by half the gap on every side.
+    private func rect(_ frame: OutfitBoardLayout.Frame, in size: CGSize) -> CGRect {
+        let x: CGFloat = size.width * frame.x + gap / 2
+        let y: CGFloat = size.height * frame.y + gap / 2
+        let width: CGFloat = max(0, size.width * frame.width - gap)
+        let height: CGFloat = max(0, size.height * frame.height - gap)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
+
+    private func tile(_ item: BoardItem, in rect: CGRect) -> some View {
+        Button {
+            onTap?(item)
+        } label: {
+            GarmentImage(url: item.imageURL)
+        }
+        .buttonStyle(.plain)
+        .disabled(onTap == nil)
+        .frame(width: rect.width, height: rect.height)
+        .offset(x: rect.minX, y: rect.minY)
+        .accessibilityLabel("\(Garment.category(item.role))，\(item.name)")
     }
 }
