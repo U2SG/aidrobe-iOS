@@ -71,7 +71,7 @@ struct OutfitShareSheet: View {
 
     private func prepare() async {
         let requests = draft.items.compactMap { item in item.imageURL.map { (item.id, $0) } }
-        guard !requests.isEmpty, requests.count == draft.items.count else {
+        guard !requests.isEmpty else {
             failed = true
             return
         }

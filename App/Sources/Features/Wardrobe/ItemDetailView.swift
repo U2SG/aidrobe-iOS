@@ -52,6 +52,18 @@ struct ItemDetailView: View {
                     Label("正在生成商品图…", systemImage: "sparkles")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
+                } else if item.cutoutStatus == "rejected" {
+                    Text("商品图未通过核对，已保留参考图")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                } else if item.cutoutStatus == "failed" {
+                    Text("商品图生成失败，已保留参考图")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                } else if item.cutoutStatus == "skipped" {
+                    Text("暂无商品图")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
                 }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.displayName)

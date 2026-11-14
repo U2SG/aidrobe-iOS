@@ -148,21 +148,18 @@ final class TodayModel {
 
     func boardItems(for outfit: Wire.OutfitResponse) -> [BoardItem] {
         let order = ["outerwear", "top", "dress", "bottom", "shoes"]
-        let items = outfit.items.compactMap { slot in
-            wardrobe.item(swaps[outfit.outfitId]?[slot.itemId] ?? slot.itemId)
-        }
-        let sourceCounts = Dictionary(grouping: items.compactMap(\.originalImageUrl), by: { $0 }).mapValues(\.count)
         return outfit.items.map { slot -> BoardItem in
             let itemID = swaps[outfit.outfitId]?[slot.itemId] ?? slot.itemId
             let item = wardrobe.item(itemID)
-            let sharedSource = item?.originalImageUrl.map { sourceCounts[$0, default: 0] > 1 } ?? false
-            let repeatedOriginal = sharedSource && (item?.coverImageUrl == nil || item?.coverImageUrl == item?.originalImageUrl)
+            let individualImage = item?.coverImageUrl.flatMap { cover in
+                item?.cutoutStatus == "ready" || cover != item?.originalImageUrl ? URL(string: cover) : nil
+            }
             return BoardItem(
                 slotID: slot.itemId,
                 itemID: itemID,
                 role: item?.category ?? slot.category ?? "accessory",
                 name: item?.displayName ?? slot.title ?? "单品",
-                imageURL: repeatedOriginal ? nil : item.flatMap(WardrobeStore.imageURL),
+                imageURL: individualImage,
                 usesGeneratedCover: item?.cutoutStatus == "ready"
             )
         }

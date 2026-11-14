@@ -513,17 +513,34 @@ struct OutfitBoard: View {
                 Button {
                     onTap(item)
                 } label: {
-                    GarmentImage(url: item.imageURL, forceOriginal: item.usesGeneratedCover)
+                    piece(item)
                 }
                 .buttonStyle(.plain)
-            } else if let pictures {
-                GarmentPicture(render: pictures[item.id])
+            } else if let pictures, let picture = pictures[item.id] {
+                GarmentPicture(render: picture, fit: true)
             } else {
-                GarmentImage(url: item.imageURL, forceOriginal: item.usesGeneratedCover)
+                piece(item)
             }
         }
         .frame(width: rect.width, height: rect.height)
         .offset(x: rect.minX, y: rect.minY)
         .accessibilityLabel("\(Garment.category(item.role))，\(item.name)")
+    }
+
+    @ViewBuilder
+    private func piece(_ item: BoardItem) -> some View {
+        if let url = item.imageURL {
+            GarmentImage(url: url, forceOriginal: item.usesGeneratedCover, fit: true)
+        } else {
+            RoundedRectangle(cornerRadius: Radius.tile)
+                .fill(Color.fill)
+                .overlay {
+                    Text(item.name)
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                        .multilineTextAlignment(.center)
+                        .padding(Spacing.control)
+                }
+        }
     }
 }

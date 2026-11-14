@@ -273,13 +273,16 @@ private struct ConfirmImportView: View {
                     if draft.possibleDuplicates.isEmpty {
                         GarmentImage(url: draft.imageURL, forceOriginal: true, fit: true)
                             .frame(height: 180)
+                        Text(draft.imageCaption)
+                            .font(.caption)
+                            .foregroundStyle(Color.secondaryLabel)
                     } else {
                         ForEach(draft.possibleDuplicates, id: \.itemId) { match in
                             VStack(alignment: .leading, spacing: Spacing.tight) {
                                 Label("可能已在衣橱", systemImage: "square.on.square")
                                     .font(.subheadline)
                                 HStack(alignment: .top, spacing: Spacing.control) {
-                                    comparison("本次识别", url: draft.imageURL)
+                                    comparison(draft.imageCaption, url: draft.imageURL)
                                     comparison(match.title, url: match.imageUrl.flatMap(URL.init(string:)))
                                 }
                             }
