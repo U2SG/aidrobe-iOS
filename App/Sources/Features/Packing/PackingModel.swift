@@ -1,0 +1,147 @@
+import AidrobeKit
+import Foundation
+
+/// Display copy for trips. Scene keys are the ones the backend's generator
+/// knows (`SCENE_CATEGORIES`); anything else it treats as casual.
+enum PackingCopy {
+    static let scenes: [(key: String, title: String)] = [
+        ("casual", "休闲"), ("business", "商务"), ("formal", "正式"),
+        ("dinner", "聚餐"), ("sport", "运动"), ("beach", "海边"),
+    ]
+
+    static func scene(_ key: String) -> String {
+        scenes.first { $0.key == key.lowercased() }?.title ?? "日常"
+    }
+
+    static func title(_ list: Wire.PackingListResponse) -> String {
+        guard let destination = list.destination, !destination.isEmpty else { return "这趟出门" }
+        return "去\(destination)"
+    }
+
+    /// "3 天 · 11月20日出发 · 休闲、商务"
+    static func summary(_ list: Wire.PackingListResponse) -> String {
+        var parts: [String] = []
+        if let days = list.days { parts.append("\(days) 天") }
+        if let day = Garment.day(list.departureDate) { parts.append("\(day)出发") }
+        if !list.scenes.isEmpty { parts.append(list.scenes.map(scene).joined(separator: "、")) }
+        return parts.joined(separator: " · ")
+    }
+}
+
+/// One garment to bring, however many days it is worn.
+struct PackingPiece: Identifiable, Equatable {
+    let itemID: String
+    let days: [Int]
+    let isPacked: Bool
+
+    var id: String { itemID }
+}
+
+extension Wire.PackingListResponse {
+    /// Unique garments in first-use order. The list stores one row per day a
+    /// piece is worn; it counts as packed only when every row says so.
+    var pieces: [PackingPiece] {
+        var order: [String] = []
+        var rows: [String: [Wire.PackingItem]] = [:]
+        for item in items {
+            if rows[item.itemId] == nil { order.append(item.itemId) }
+            rows[item.itemId, default: []].append(item)
+        }
+        return order.map { id in
+            let entries = rows[id] ?? []
+            return PackingPiece(
+                itemID: id,
+                days: Array(Set(entries.map(\.day))).sorted(),
+                isPacked: entries.allSatisfy { $0.packed == true }
+            )
+        }
+    }
+}
+
+@MainActor
+@Observable
+final class PackingModel {
+    enum Phase: Equatable {
+        case loading, loaded
+        /// Backend flag is off (503).
+        case unavailable
+        case failed(String)
+    }
+
+    private(set) var phase: Phase = .loading
+    private(set) var lists: [Wire.PackingListResponse] = []
+    private(set) var isCreating = false
+    var notice: String?
+
+    private let api: APIClient
+
+    init(api: APIClient) {
+        self.api = api
+    }
+
+    func list(_ id: String) -> Wire.PackingListResponse? {
+        lists.first { $0.packingListId == id }
+    }
+
+    func load() async {
+        if lists.isEmpty { phase = .loading }
+        do {
+            lists = try await api.send(Endpoints.packingLists())
+            phase = .loaded
+        } catch let error as APIError where error.isFeatureDisabled {
+            phase = .unavailable
+        } catch {
+            if lists.isEmpty { phase = .failed(userMessage(for: error)) }
+        }
+    }
+
+    /// Returns the new list's id, or nil with `notice` set.
+    func create(destination: String, days: Int, departure: Date?, scenes: [String], weather: String) async -> String? {
+        isCreating = true
+        defer { isCreating = false }
+        let place = destination.trimmingCharacters(in: .whitespaces)
+        let hint = weather.trimmingCharacters(in: .whitespaces)
+        do {
+            let list = try await api.send(Endpoints.createPackingList(.init(
+                destination: place.isEmpty ? nil : place,
+                days: days,
+                scenes: scenes,
+                weatherHint: hint.isEmpty ? nil : hint,
+                departureDate: departure.map(Self.calendarDay)
+            )))
+            lists.insert(list, at: 0)
+            phase = .loaded
+            return list.packingListId
+        } catch {
+            notice = userMessage(for: error)
+            return nil
+        }
+    }
+
+    /// Ticks a garment for every day it is worn. Optimistic; rolls back on failure.
+    func setPacked(_ packed: Bool, itemID: String, in listID: String) async {
+        guard let index = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
+        let before = lists[index]
+        var items = before.items
+        for row in items.indices where items[row].itemId == itemID { items[row].packed = packed }
+        lists[index].items = items
+        do {
+            let saved = try await api.send(Endpoints.updatePackingList(listID, items: items))
+            // Keep the plan we already have if the update response leaves it out.
+            if let current = lists.firstIndex(where: { $0.packingListId == listID }) {
+                var merged = saved
+                if merged.plan == nil { merged.plan = before.plan }
+                lists[current] = merged
+            }
+        } catch {
+            if let current = lists.firstIndex(where: { $0.packingListId == listID }) { lists[current] = before }
+            notice = userMessage(for: error)
+        }
+    }
+
+    /// `yyyy-MM-dd` in the user's calendar (a departure date is a calendar day, not an instant).
+    private static func calendarDay(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
+    }
+}
