@@ -45,9 +45,11 @@ static float roomDepth(float2 uv, float height, float sunSide) {
     return smoothstep(0.1, 1.0, distance(uv, window) / length(float2(1.0, height)));
 }
 
-// Share of direct sun reaching this point: through the window, past its bars,
-// past a branch outside, past whatever cloud is overhead right now.
-static float directSun(float2 uv, float time, float cloud, float wind, float windSide,
+// x: share of direct sun reaching this point — through the window, past its
+// bars, past a branch outside, past whatever cloud is overhead right now.
+// y: how deep in leaf shade the point is (leaves close to the glass throw a
+// darker core than the open sky alone would leave).
+static float2 directSun(float2 uv, float time, float cloud, float wind, float windSide,
                        float humidity, float dust, float elevation, float sunSide) {
     // Low sun throws the window long and slanted; high sun drops it short and upright.
     float shear = sunSide * (0.16 + 0.75 * (1.0 - elevation));
@@ -84,7 +86,7 @@ static float directSun(float2 uv, float time, float cloud, float wind, float win
     float gap = 1.0 - cloud;
     float shadowed = smoothstep(gap - 0.20, gap + 0.20, field * 1.1);
 
-    return inside * bars * (1.0 - leaves * 0.9) * (1.0 - shadowed);
+    return float2(inside * bars * (1.0 - leaves * 0.9) * (1.0 - shadowed), leaves * inside * (1.0 - shadowed));
 }
 
 [[ stitchable ]] half4 weatherLighting(float2 position, half4 color, float2 size, float time, float dark,
@@ -93,7 +95,9 @@ static float directSun(float2 uv, float time, float cloud, float wind, float win
                                        float elevation, float sunSide, float night, float flash) {
     float2 uv = position / size.x;
     float height = size.y / size.x;
-    float lit = sun > 0.01 ? directSun(uv, time, cloud, wind, windSide, humidity, dust, elevation, sunSide) * sun : 0.0;
+    float2 direct = sun > 0.01
+        ? directSun(uv, time, cloud, wind, windSide, humidity, dust, elevation, sunSide) * sun : float2(0.0);
+    float lit = direct.x;
     float depth = roomDepth(uv, height, sunSide);
     float wet = max(rain, snow * 0.5);
 
@@ -125,6 +129,7 @@ static float directSun(float2 uv, float time, float cloud, float wind, float win
     float3 sunTone = mix(float3(1.0, 0.99, 0.965), float3(1.0, 0.955, 0.885), (1.0 - elevation) * 0.85);
     sunTone *= mix(float3(1.0), float3(0.99, 0.95, 0.86), dust * 0.6);
     tone = mix(tone, sunTone, lit);
+    tone *= 1.0 - 0.07 * direct.y;
 
     // Diffuse daylight falls off into the room; the flatter the day, the more this is all there is.
     tone *= 1.0 - depth * (0.015 + 0.05 * cloud * (1.0 - lit) + 0.035 * wet + 0.03 * fog + 0.03 * dust);

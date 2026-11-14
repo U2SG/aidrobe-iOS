@@ -173,6 +173,13 @@ final class WalkthroughTests: XCTestCase {
         for (staged, name) in dark { stage(staged, name, appearance: "dark") }
     }
 
+    /// A quick look at direct sun only, for tuning window light and leaf shade.
+    func testWeatherSun() {
+        stage("晴,24,10,6,40", "50-clear-morning", appearance: "light")
+        stage("晴,22,16,30,45", "52b-clear-afternoon-breezy", appearance: "light")
+        stage("晴,24,10,6,40", "70-dark-clear", appearance: "dark")
+    }
+
     private func stage(_ weather: String, _ name: String, appearance: String) {
         launch(onboarded: true, extra: ["-aidrobe.debug.weather", weather, "-aidrobe.display.appearance", appearance])
         XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
