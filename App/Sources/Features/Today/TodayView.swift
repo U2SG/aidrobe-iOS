@@ -234,24 +234,14 @@ private struct TodayPage: View {
                                 }
                             }
 
-                        if model.generatingOutfits.contains(outfit.outfitId) {
-                            HStack {
-                                ProgressView()
-                                Text("正在生成整套搭配图…").font(.footnote)
-                            }
-                        } else if !hasSwaps {
-                            if model.generatedImages[outfit.outfitId] == nil {
-                                Button("生成整套搭配图", systemImage: "sparkles") {
-                                    generationTarget = outfit
-                                    showsGenerationConfirm = true
-                                }
-                            } else {
-                                Button(showPieces.contains(outfit.outfitId) ? "看生成图" : "看单品") {
-                                    if !showPieces.insert(outfit.outfitId).inserted {
-                                        showPieces.remove(outfit.outfitId)
-                                    }
+                        if !hasSwaps {
+                            let previewIsOpen = showPieces.contains(outfit.outfitId)
+                            Button(previewIsOpen ? "返回整套搭配图" : "看单品拼图") {
+                                if !showPieces.insert(outfit.outfitId).inserted {
+                                    showPieces.remove(outfit.outfitId)
                                 }
                             }
+                            .font(.footnote)
                         }
                     }
                     .containerRelativeFrame(.horizontal)
@@ -267,15 +257,31 @@ private struct TodayPage: View {
 
     @ViewBuilder
     private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem], hasSwaps: Bool) -> some View {
-        if let image = model.generatedImages[outfit.outfitId],
-           !hasSwaps, !showPieces.contains(outfit.outfitId) {
-            GarmentImage(url: image, forceOriginal: true, fit: true)
-                .aspectRatio(0.86, contentMode: .fit)
-                .accessibilityLabel("AI 生成的整套搭配图")
-        } else {
+        if hasSwaps || showPieces.contains(outfit.outfitId) {
             OutfitBoard(items: items) { slot in
                 swapTarget = SwapTarget(outfit: outfit, slot: slot)
             }
+        } else if let image = model.generatedImages[outfit.outfitId] {
+            GarmentImage(url: image, forceOriginal: true, fit: true)
+                .aspectRatio(0.86, contentMode: .fit)
+                .accessibilityHidden(false)
+                .accessibilityLabel("AI 生成的整套搭配图")
+        } else {
+            Color.elevatedBackground
+                .aspectRatio(0.86, contentMode: .fit)
+                .clipShape(.rect(cornerRadius: Radius.card))
+                .overlay {
+                    if model.generatingOutfits.contains(outfit.outfitId) {
+                        ProgressView("正在准备整套搭配图…")
+                            .font(.footnote)
+                    } else {
+                        Button("生成整套搭配图", systemImage: "sparkles") {
+                            generationTarget = outfit
+                            showsGenerationConfirm = true
+                        }
+                        .buttonStyle(.glass)
+                    }
+                }
         }
     }
 
