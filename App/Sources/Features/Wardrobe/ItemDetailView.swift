@@ -247,7 +247,8 @@ private struct ItemEditSheet: View {
                                     category: category,
                                     colorMain: color,
                                     material: material.isEmpty ? nil : material,
-                                    seasonTags: Garment.seasonOptions.map(\.key).filter(seasons.contains),
+                                    seasonTags: Garment.seasonOptions.map(\.key).filter(seasons.contains)
+                                        .compactMap(Wire.UpdateWardrobeItemRequest.SeasonTagsPayloadPayload.init(rawValue:)),
                                     formalityScore: formality == 0 ? nil : formality
                                 ))
                                 dismiss()
