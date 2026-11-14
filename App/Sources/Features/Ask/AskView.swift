@@ -42,11 +42,7 @@ struct AskView<Tools: View>: View {
                     ForEach(model.entries) { entry in
                         AskEntryView(entry: entry, model: model).id(entry.id)
                     }
-                    if model.entries.isEmpty {
-                        opening(model)
-                    } else if Tools.self != EmptyView.self {
-                        toolsSection
-                    }
+                    if model.entries.isEmpty { opening(model) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.screen)
@@ -67,9 +63,24 @@ struct AskView<Tools: View>: View {
     private func header(_ model: AskModel) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("问问").kicker()
-            Text(model.entries.isEmpty ? "想问衣橱什么？" : "接着问")
-                .font(.display(34, weight: .black, relativeTo: .largeTitle))
-                .foregroundStyle(Color.label)
+            HStack(alignment: .bottom) {
+                Text(model.entries.isEmpty ? "想问衣橱什么？" : "接着问")
+                    .font(.display(34, weight: .black, relativeTo: .largeTitle))
+                    .foregroundStyle(Color.label)
+                Spacer()
+                if !model.entries.isEmpty {
+                    Button {
+                        Task { await model.startOver() }
+                    } label: {
+                        Image(systemName: "square.and.pencil")
+                            .frame(width: 28, height: 28)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .disabled(model.isAsking)
+                    .accessibilityLabel("新对话")
+                }
+            }
             if model.entries.isEmpty {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)

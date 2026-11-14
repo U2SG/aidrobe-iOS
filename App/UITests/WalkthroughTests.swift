@@ -37,6 +37,14 @@ final class WalkthroughTests: XCTestCase {
         app.tabBars.buttons["问问"].tap()
         settle(3)
         shot("40-ask")
+        app.buttons["周五面试穿什么"].tap()
+        // With an answer model the page shows the answer and its garments; without one, a quiet note.
+        let answered = app.buttons["有帮助"].waitForExistence(timeout: 45)
+        settle(2)
+        shot(answered ? "40a-ask-answer" : "40a-ask-unavailable")
+        app.buttons["新对话"].tap()
+        settle(3)
+        shot("40c-ask-new")
         push("该不该买", shot: "41-should-i-buy")
         push("出行打包", shot: "42-packing", stay: true)
         let trip = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '杭州'")).firstMatch

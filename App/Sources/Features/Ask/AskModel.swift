@@ -82,6 +82,13 @@ final class AskModel {
     }
 
     /// Asks the same question again after a failure, in place.
+    /// Clears the page for a fresh conversation; what was asked stays in "之前问过".
+    func startOver() async {
+        entries = []
+        conversationID = nil
+        await load()
+    }
+
     func retry(_ entry: Entry) async {
         entries.removeAll { $0.id == entry.id }
         await ask(entry.question)
