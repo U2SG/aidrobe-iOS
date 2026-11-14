@@ -100,6 +100,7 @@ private struct TodayPage: View {
     @State private var swapTarget: SwapTarget?
     @State private var feedbackOutfit: Wire.OutfitResponse?
     @State private var showsContext = false
+    @State private var shareDraft: OutfitShareDraft?
 
     private var outfit: Wire.OutfitResponse {
         model.outfits.first { $0.outfitId == currentID } ?? model.outfits[0]
@@ -145,6 +146,9 @@ private struct TodayPage: View {
         }
         .sheet(isPresented: $showsContext) {
             ContextSheet(model: model)
+        }
+        .sheet(item: $shareDraft) { draft in
+            OutfitShareSheet(draft: draft)
         }
         .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
         .sensoryFeedback(.selection, trigger: currentID)
@@ -201,7 +205,24 @@ private struct TodayPage: View {
                     OutfitBoard(items: model.boardItems(for: outfit)) { slot in
                         swapTarget = SwapTarget(outfit: outfit, slot: slot)
                     }
-                    .overlay(alignment: .topTrailing) { favoriteButton(outfit) }
+                    .overlay(alignment: .topTrailing) {
+                        HStack(spacing: 0) {
+                            Button {
+                                shareDraft = OutfitShareDraft(
+                                    items: model.boardItems(for: outfit),
+                                    date: Garment.day(model.today?.recommendationDate)
+                                )
+                            } label: {
+                                Image(systemName: "square.and.arrow.up")
+                                    .foregroundStyle(Color.secondaryLabel)
+                                    .frame(width: 44, height: 44)
+                                    .contentShape(.rect)
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel("分享这套")
+                            favoriteButton(outfit)
+                        }
+                    }
                     .containerRelativeFrame(.horizontal)
                 }
             }
@@ -403,6 +424,7 @@ extension Wire.OutfitResponse: @retroactive Identifiable {
 /// by how tall the piece is. Tapping a garment offers to swap it.
 struct OutfitBoard: View {
     let items: [BoardItem]
+    var pictures: [String: GarmentRender]?
     var onTap: ((BoardItem) -> Void)?
 
     private let gap: CGFloat = 8
@@ -432,13 +454,20 @@ struct OutfitBoard: View {
     }
 
     private func tile(_ item: BoardItem, in rect: CGRect) -> some View {
-        Button {
-            onTap?(item)
-        } label: {
-            GarmentImage(url: item.imageURL)
+        Group {
+            if let onTap {
+                Button {
+                    onTap(item)
+                } label: {
+                    GarmentImage(url: item.imageURL)
+                }
+                .buttonStyle(.plain)
+            } else if let pictures {
+                GarmentPicture(render: pictures[item.id])
+            } else {
+                GarmentImage(url: item.imageURL)
+            }
         }
-        .buttonStyle(.plain)
-        .disabled(onTap == nil)
         .frame(width: rect.width, height: rect.height)
         .offset(x: rect.minX, y: rect.minY)
         .accessibilityLabel("\(Garment.category(item.role))，\(item.name)")
