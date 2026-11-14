@@ -110,7 +110,9 @@ struct ProfileView: View {
         Section {
             Button {
                 Task {
-                    if let place = await model.useCurrentLocation() { placeName = place }
+                    let generation = AccountLocalData.generation
+                    if let place = await model.useCurrentLocation(),
+                       generation == AccountLocalData.generation { placeName = place }
                 }
             } label: {
                 HStack {

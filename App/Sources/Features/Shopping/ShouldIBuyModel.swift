@@ -48,6 +48,7 @@ final class ShouldIBuyModel {
 
     private let api: APIClient
     private let uploader: PresignedUploader
+    private let accountGeneration = AccountLocalData.generation
     private static let historyKey = AccountLocalData.purchaseHistoryKey
 
     init(api: APIClient) {
@@ -167,6 +168,7 @@ final class ShouldIBuyModel {
     }
 
     private func persist() {
+        guard accountGeneration == AccountLocalData.generation else { return }
         UserDefaults.standard.set(try? JSONEncoder().encode(history), forKey: Self.historyKey)
     }
 }

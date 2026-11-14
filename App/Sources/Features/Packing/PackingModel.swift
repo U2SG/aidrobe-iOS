@@ -75,6 +75,7 @@ final class PackingModel {
     /// Lists with a save in flight, and lists edited since that save was sent.
     private var saving: Set<String> = []
     private var unsaved: Set<String> = []
+    private var listRevision = UUID()
 
     private let api: APIClient
 
@@ -87,9 +88,14 @@ final class PackingModel {
     }
 
     func load() async {
+        guard saving.isEmpty, !isCreating else { return }
+        let revision = listRevision
         if lists.isEmpty { phase = .loading }
         do {
-            lists = try await api.send(Endpoints.packingLists())
+            let loaded = try await api.send(Endpoints.packingLists())
+            // A reload started before an edit may contain an older snapshot.
+            guard revision == listRevision else { return }
+            lists = loaded
             phase = .loaded
         } catch let error as APIError where error.isFeatureDisabled {
             phase = .unavailable
@@ -100,6 +106,7 @@ final class PackingModel {
 
     /// Returns the new list's id, or nil with `notice` set.
     func create(destination: String, days: Int, departure: Date?, scenes: [String], weather: String) async -> String? {
+        listRevision = UUID()
         isCreating = true
         defer { isCreating = false }
         let place = destination.trimmingCharacters(in: .whitespaces)
@@ -126,6 +133,7 @@ final class PackingModel {
     /// list — ticks made while one is in flight go out together in the next.
     func setPacked(_ packed: Bool, itemID: String, in listID: String) async {
         guard let index = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
+        listRevision = UUID()
         var confirmed = lists[index]
         for row in lists[index].items.indices where lists[index].items[row].itemId == itemID {
             lists[index].items[row].packed = packed

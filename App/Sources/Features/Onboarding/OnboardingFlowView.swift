@@ -170,7 +170,9 @@ private struct RoutineStep: View {
                         } else {
                             Button(model.settings?.location == nil ? "用当前位置" : (placeName.isEmpty ? "已设置" : placeName)) {
                                 Task {
-                                    if let place = await model.useCurrentLocation() { placeName = place }
+                                    let generation = AccountLocalData.generation
+                                    if let place = await model.useCurrentLocation(),
+                                       generation == AccountLocalData.generation { placeName = place }
                                 }
                             }
                             .foregroundStyle(model.settings?.location == nil ? Color.accent : Color.label)

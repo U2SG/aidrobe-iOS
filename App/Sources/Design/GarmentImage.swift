@@ -136,7 +136,10 @@ enum AccountLocalData {
     static let wornTodayKey = "aidrobe.today.worn"
     static let placeNameKey = "aidrobe.settings.placeName"
 
-    static func clear() {
+    @MainActor private(set) static var generation = UUID()
+
+    @MainActor static func clear() {
+        generation = UUID()
         for key in [purchaseHistoryKey, wornTodayKey, placeNameKey] {
             UserDefaults.standard.removeObject(forKey: key)
         }
