@@ -128,6 +128,24 @@ struct GarmentImage: View {
     }
 }
 
+/// Records kept only on this device that belong to the signed-in account.
+/// They go when the account signs out or its data is cleared, so the next
+/// account on the device never sees them.
+enum AccountLocalData {
+    static let purchaseHistoryKey = "aidrobe.shopping.asked"
+    static let wornTodayKey = "aidrobe.today.worn"
+    static let placeNameKey = "aidrobe.settings.placeName"
+
+    @MainActor private(set) static var generation = UUID()
+
+    @MainActor static func clear() {
+        generation = UUID()
+        for key in [purchaseHistoryKey, wornTodayKey, placeNameKey] {
+            UserDefaults.standard.removeObject(forKey: key)
+        }
+    }
+}
+
 enum Preferences {
     static let cutoutKey = "aidrobe.display.cutout"
     static let appearanceKey = "aidrobe.display.appearance"

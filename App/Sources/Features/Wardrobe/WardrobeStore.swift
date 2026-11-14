@@ -16,6 +16,8 @@ final class WardrobeStore {
     private(set) var items: [Wire.WardrobeItemResponse] = []
 
     private let api: APIClient
+    private static let pageSize = 100
+    private var loadID = UUID()
 
     init(api: APIClient) {
         self.api = api
@@ -38,16 +40,33 @@ final class WardrobeStore {
     }
 
     func load() async {
+        let requestID = UUID()
+        loadID = requestID
+        let generation = AccountLocalData.generation
         if items.isEmpty { phase = .loading }
         do {
-            items = try await api.send(Endpoints.wardrobeItems()).items
+            // Every screen treats a missing id as "no longer in the wardrobe", so
+            // the store must hold all of it, not just the first page.
+            var loaded: [Wire.WardrobeItemResponse] = []
+            var seen: Set<String> = []
+            var offset = 0
+            while true {
+                let page = try await api.send(Endpoints.wardrobeItems(limit: Self.pageSize, offset: offset))
+                guard requestID == loadID, generation == AccountLocalData.generation else { return }
+                loaded += page.items.filter { seen.insert($0.itemId).inserted }
+                offset += page.items.count
+                if page.items.isEmpty || offset >= page.total { break }
+            }
+            items = loaded
             phase = .loaded
         } catch {
+            guard requestID == loadID, generation == AccountLocalData.generation else { return }
             if items.isEmpty { phase = .failed(userMessage(for: error)) }
         }
     }
 
     func reset() {
+        loadID = UUID()
         items = []
         phase = .idle
     }

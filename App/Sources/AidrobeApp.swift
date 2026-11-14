@@ -61,6 +61,7 @@ final class AppModel {
     func signOut() {
         tokens.clear()
         wardrobe.reset()
+        AccountLocalData.clear()
         onboardingCompleted = false
     }
 

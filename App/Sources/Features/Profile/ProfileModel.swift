@@ -52,6 +52,7 @@ final class ProfileModel {
     /// Reads the device location once and stores it as the weather location.
     /// Returns the place name to show, if one could be resolved.
     func useCurrentLocation() async -> String? {
+        let generation = AccountLocalData.generation
         isLocating = true
         defer { isLocating = false }
         let session = CLServiceSession(authorization: .whenInUse)
@@ -62,6 +63,7 @@ final class ProfileModel {
                     notice = "没有定位权限，可以在系统设置里打开"
                     return nil
                 }
+                guard generation == AccountLocalData.generation else { return nil }
                 guard let location = update.location else { continue }
                 await save(.init(location: SettingsFormat.location(
                     latitude: location.coordinate.latitude, longitude: location.coordinate.longitude

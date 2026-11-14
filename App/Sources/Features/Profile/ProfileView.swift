@@ -5,7 +5,7 @@ struct ProfileView: View {
     @Environment(AppModel.self) private var app
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @AppStorage(Preferences.appearanceKey) private var appearance = "system"
-    @AppStorage("aidrobe.settings.placeName") private var placeName = ""
+    @AppStorage(AccountLocalData.placeNameKey) private var placeName = ""
     @State private var model: ProfileModel?
 
     var body: some View {
@@ -110,7 +110,9 @@ struct ProfileView: View {
         Section {
             Button {
                 Task {
-                    if let place = await model.useCurrentLocation() { placeName = place }
+                    let generation = AccountLocalData.generation
+                    if let place = await model.useCurrentLocation(),
+                       generation == AccountLocalData.generation { placeName = place }
                 }
             } label: {
                 HStack {

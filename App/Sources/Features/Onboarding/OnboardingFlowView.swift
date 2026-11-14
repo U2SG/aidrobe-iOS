@@ -151,7 +151,7 @@ private struct ClothesStep: View {
 private struct RoutineStep: View {
     let next: () -> Void
     @Environment(AppModel.self) private var app
-    @AppStorage("aidrobe.settings.placeName") private var placeName = ""
+    @AppStorage(AccountLocalData.placeNameKey) private var placeName = ""
     @State private var model: ProfileModel?
 
     var body: some View {
@@ -170,7 +170,9 @@ private struct RoutineStep: View {
                         } else {
                             Button(model.settings?.location == nil ? "用当前位置" : (placeName.isEmpty ? "已设置" : placeName)) {
                                 Task {
-                                    if let place = await model.useCurrentLocation() { placeName = place }
+                                    let generation = AccountLocalData.generation
+                                    if let place = await model.useCurrentLocation(),
+                                       generation == AccountLocalData.generation { placeName = place }
                                 }
                             }
                             .foregroundStyle(model.settings?.location == nil ? Color.accent : Color.label)

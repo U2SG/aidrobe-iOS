@@ -64,21 +64,30 @@ final class AskModel {
     func ask(_ raw: String) async {
         let question = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, !isAsking else { return }
-        entries.append(Entry(question: question, state: .asking))
-        let index = entries.count - 1
+        let entry = Entry(question: question, state: .asking)
+        entries.append(entry)
         do {
             let answer = try await api.send(Endpoints.ask(question, conversationID: conversationID))
-            conversationID = answer.conversationId ?? conversationID
-            entries[index].state = .answered(
+            // The page may have been cleared while this was in flight; then the answer has nowhere to go.
+            guard setState(of: entry.id, to: .answered(
                 sessionID: answer.askSessionId,
                 text: answer.answer,
                 garments: garments(ids: answer.itemRefs, snapshots: answer.itemRefSnapshots ?? [])
-            )
+            )) else { return }
+            conversationID = answer.conversationId ?? conversationID
         } catch let error as APIError where error.isFeatureDisabled {
-            entries[index].state = .unavailable
+            setState(of: entry.id, to: .unavailable)
         } catch {
-            entries[index].state = .failed(userMessage(for: error))
+            setState(of: entry.id, to: .failed(userMessage(for: error)))
         }
+    }
+
+    /// Entries are addressed by id: the array can change while a request is in flight.
+    @discardableResult
+    private func setState(of id: UUID, to state: Entry.State) -> Bool {
+        guard let index = entries.firstIndex(where: { $0.id == id }) else { return false }
+        entries[index].state = state
+        return true
     }
 
     /// Asks the same question again after a failure, in place.
@@ -90,6 +99,7 @@ final class AskModel {
     }
 
     func retry(_ entry: Entry) async {
+        guard !isAsking else { return }
         entries.removeAll { $0.id == entry.id }
         await ask(entry.question)
     }

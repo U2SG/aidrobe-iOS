@@ -183,6 +183,7 @@ struct PrivacyView: View {
             defer { isWorking = false }
             do {
                 _ = try await app.api.send(Endpoints.clearAllData())
+                AccountLocalData.clear()
                 await app.wardrobe.load()
                 notice = "已清空"
             } catch {

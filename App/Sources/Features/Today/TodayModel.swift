@@ -172,13 +172,16 @@ final class TodayModel {
     // MARK: Actions
 
     func markWorn(_ outfit: Wire.OutfitResponse) async {
+        let accountGeneration = AccountLocalData.generation
         do {
             _ = try await api.send(Endpoints.markWorn(outfitID: outfit.outfitId))
             // The outfit record knows only the recommended pieces; pieces the
             // user swapped in get their own wear record.
             for item in boardItems(for: outfit) where item.isSwapped {
+                guard accountGeneration == AccountLocalData.generation else { return }
                 try? await wardrobe.markWorn(item.itemID)
             }
+            guard accountGeneration == AccountLocalData.generation else { return }
             wornOutfitIDs.insert(outfit.outfitId)
             if let day = today?.recommendationDate { wornLedger.record(outfit.outfitId, on: day) }
             await wardrobe.load()
@@ -213,8 +216,9 @@ final class TodayModel {
 /// Remembers which outfits were worn on the current recommendation day so the
 /// page still says so after a relaunch (the recommendation payload doesn't).
 /// Keyed by the server's `recommendation_date`, never the device's idea of today.
+@MainActor
 private struct WornLedger {
-    private static let key = "aidrobe.today.worn"
+    private static let key = AccountLocalData.wornTodayKey
 
     func outfits(on day: String) -> Set<String> {
         let stored = UserDefaults.standard.dictionary(forKey: Self.key) as? [String: [String]]
