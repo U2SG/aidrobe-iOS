@@ -93,6 +93,32 @@ final class WardrobeStore {
         replace(try await api.send(Endpoints.updateItem(id, changes)))
     }
 
+    func recognize(_ id: String) async throws -> Wire.WardrobeRecognitionResponse {
+        try await api.send(Endpoints.recognizeItem(id))
+    }
+
+    func requestProductImage(_ id: String) async throws {
+        let generation = AccountLocalData.generation
+        let item = try await api.send(Endpoints.generateItemProductImage(id))
+        if generation == AccountLocalData.generation { replace(item) }
+    }
+
+    func refreshProductImage(_ id: String) async {
+        let generation = AccountLocalData.generation
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(240))
+        while item(id)?.cutoutStatus == "queued", clock.now < deadline {
+            do {
+                try await clock.sleep(for: .seconds(4))
+                let updated = try await api.send(Endpoints.wardrobeItem(id))
+                guard !Task.isCancelled, generation == AccountLocalData.generation else { return }
+                replace(updated)
+            } catch {
+                if Task.isCancelled { return }
+            }
+        }
+    }
+
     func updateFit(_ id: String, _ status: Wire.FitStatus) async throws {
         replace(try await api.send(Endpoints.updateFit(id, status: status)))
     }
