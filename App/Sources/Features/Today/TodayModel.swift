@@ -51,6 +51,7 @@ final class TodayModel {
     private(set) var isRefreshing = false
     private(set) var generatedImages: [String: URL] = [:]
     private(set) var generatingOutfits: Set<String> = []
+    private(set) var rejectedOutfitImages: Set<String> = []
     /// outfit id → recommended item id → the item the user chose instead.
     private var swaps: [String: [String: String]] = [:]
     var notice: String?
@@ -170,7 +171,9 @@ final class TodayModel {
     }
 
     func loadGeneratedImage(for outfitID: String) async {
-        guard generatedImages[outfitID] == nil, generatingOutfits.insert(outfitID).inserted else { return }
+        guard generatedImages[outfitID] == nil,
+              !rejectedOutfitImages.contains(outfitID),
+              generatingOutfits.insert(outfitID).inserted else { return }
         defer { generatingOutfits.remove(outfitID) }
         do {
             let asset = try await api.send(Endpoints.generatedOutfitImage(outfitID))
@@ -209,6 +212,10 @@ final class TodayModel {
                 } else if reportFailure {
                     notice = "这套搭配图暂时打不开"
                 }
+                return
+            case "rejected_by_quality_gate":
+                rejectedOutfitImages.insert(outfitID)
+                if reportFailure { notice = "整套图未通过核对，已显示单品参考图" }
                 return
             case "failed":
                 if reportFailure { notice = "这次没能生成搭配图" }

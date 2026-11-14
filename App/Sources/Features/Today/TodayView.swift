@@ -234,7 +234,11 @@ private struct TodayPage: View {
                                 }
                             }
 
-                        if !hasSwaps {
+                        if model.rejectedOutfitImages.contains(outfit.outfitId) && !hasSwaps {
+                            Text("整套图未通过核对")
+                                .font(.footnote)
+                                .foregroundStyle(Color.secondaryLabel)
+                        } else if !hasSwaps {
                             let previewIsOpen = showPieces.contains(outfit.outfitId)
                             Button(previewIsOpen ? "返回整套搭配图" : "看单品拼图") {
                                 if !showPieces.insert(outfit.outfitId).inserted {
@@ -257,7 +261,7 @@ private struct TodayPage: View {
 
     @ViewBuilder
     private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem], hasSwaps: Bool) -> some View {
-        if hasSwaps || showPieces.contains(outfit.outfitId) {
+        if hasSwaps || showPieces.contains(outfit.outfitId) || model.rejectedOutfitImages.contains(outfit.outfitId) {
             OutfitBoard(items: items) { slot in
                 swapTarget = SwapTarget(outfit: outfit, slot: slot)
             }
