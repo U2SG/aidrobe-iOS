@@ -15,10 +15,67 @@ final class WalkthroughTests: XCTestCase {
         continueAfterFailure = true
     }
 
-    func testWelcome() {
+    func testWelcomeAndOnboarding() {
         launch(onboarded: false)
-        XCTAssert(app.buttons["开始"].waitForExistence(timeout: 10))
+        let enter = app.buttons["开发版本：以测试账号进入"]
+        XCTAssert(enter.waitForExistence(timeout: 10))
         shot("01-welcome")
+        enter.tap()
+        for step in 1...3 {
+            settle(step == 3 ? 6 : 2.5)
+            shot("01\(["a", "b", "c"][step - 1])-onboarding-\(step)")
+            let skip = app.buttons["跳过"]
+            guard skip.exists else { break }
+            skip.tap()
+        }
+    }
+
+    /// Every page beyond the main line; read-only.
+    func testMorePages() {
+        launch(onboarded: true)
+        XCTAssert(app.tabBars.buttons["问问"].waitForExistence(timeout: 60))
+        app.tabBars.buttons["问问"].tap()
+        settle(3)
+        shot("40-ask")
+        push("该不该买", shot: "41-should-i-buy")
+        push("出行打包", shot: "42-packing", stay: true)
+        let trip = app.staticTexts.matching(NSPredicate(format: "label CONTAINS '杭州'")).firstMatch
+        if trip.waitForExistence(timeout: 3) {
+            trip.tap()
+            settle(3)
+            shot("43-packing-detail")
+            back()
+        }
+        back()
+
+        app.tabBars.buttons["我的"].tap()
+        settle(2)
+        push("全部记录", shot: "45-journal")
+        app.swipeUp()
+        shot("44-profile-links")
+        push("衣橱洞察", shot: "46-insights", scrollShot: "46b-insights-more")
+        push("记住的偏好", shot: "47-memory")
+        push("数据与隐私", shot: "48-privacy")
+    }
+
+    /// Opens a row, screenshots the page (and optionally one scroll down), and comes back.
+    private func back() {
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        settle(1)
+    }
+
+    private func push(_ label: String, shot name: String, scrollShot: String? = nil, stay: Bool = false) {
+        let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
+        guard row.waitForExistence(timeout: 5) else { return XCTFail("no row \(label)") }
+        row.tap()
+        settle(4)
+        shot(name)
+        if let scrollShot {
+            app.swipeUp()
+            settle()
+            shot(scrollShot)
+        }
+        if !stay { back() }
     }
 
     func testMainLine() {
@@ -116,7 +173,8 @@ final class WalkthroughTests: XCTestCase {
 
     private func launch(onboarded: Bool, extra: [String] = []) {
         // The argument domain overrides stored defaults for this launch only.
-        app.launchArguments = ["-aidrobe.onboarding.completed", onboarded ? "YES" : "NO"] + extra
+        app.launchArguments = ["-aidrobe.onboarding.completed", onboarded ? "YES" : "NO"]
+            + (extra.isEmpty ? ["-aidrobe.display.appearance", "light"] : extra)
         app.launch()
     }
 

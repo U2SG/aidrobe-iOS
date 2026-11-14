@@ -5,6 +5,8 @@ import SwiftUI
 /// then non-production builds enter with the dev user.
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
+    /// Called once the user has a session (Apple, or the dev user in non-production builds).
+    let onStart: () -> Void
 
     private let promises = [
         ("只用你衣橱里真有的", "不推荐你没有的衣服，也不催你买。"),
@@ -50,19 +52,12 @@ struct WelcomeView: View {
                     .foregroundStyle(Color.danger)
                     .padding(.bottom, Spacing.control)
             }
+            AppleSignInButton(onSignedIn: onStart)
             if model.environment.allowsDevLogin {
-                Button {
-                    model.completeOnboarding()
-                } label: {
-                    Text("开始").frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                Text("开发版本，以测试账号进入")
-                    .font(.caption)
-                    .foregroundStyle(Color.tertiaryLabel)
-                    .frame(maxWidth: .infinity)
-                    .padding(.top, Spacing.control)
+                Button("开发版本：以测试账号进入", action: onStart)
+                    .font(.subheadline)
+                    .frame(maxWidth: .infinity, minHeight: 44)
+                    .padding(.top, Spacing.tight)
             }
         }
         .padding(Spacing.screen)

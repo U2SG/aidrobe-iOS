@@ -88,7 +88,13 @@ struct ProfileView: View {
                         }
                     }
                 }
+                NavigationLink("全部记录") { JournalView() }
             }
+        }
+        Section {
+            NavigationLink("衣橱洞察") { InsightsView() }
+            NavigationLink("记住的偏好") { MemoryView() }
+            NavigationLink("数据与隐私") { PrivacyView() }
         }
     }
 
