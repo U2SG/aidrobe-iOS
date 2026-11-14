@@ -13,6 +13,7 @@ final class ImportFlowModel {
             case uploading
             case recognising
             case needsConfirm(Wire.ImportTaskResponse)
+            case interrupted
             case confirming
             case done(itemCount: Int)
             case failed(String)
@@ -22,6 +23,11 @@ final class ImportFlowModel {
         var thumbnail: UIImage?
         var taskID: String?
         var phase: Phase
+
+        var pendingTask: Wire.ImportTaskResponse? {
+            guard case let .needsConfirm(task) = phase else { return nil }
+            return task
+        }
     }
 
     /// One candidate as edited on the confirm form.
@@ -39,28 +45,17 @@ final class ImportFlowModel {
 
     private(set) var jobs: [Job] = []
     private(set) var pendingError: String?
+    private(set) var isLoadingPending = false
     private let api: APIClient
     private let uploader: PresignedUploader
     private let store: UserDefaults
-    private static let pendingKey = "aidrobe.pendingImportTasks"
+    private let accountGeneration = AccountLocalData.generation
+    static let pendingKey = "aidrobe.pendingImportTasks"
 
     init(api: APIClient, store: UserDefaults = .standard) {
         self.api = api
         self.uploader = PresignedUploader(api: api)
         self.store = store
-    }
-
-    var pendingConfirmCount: Int {
-        jobs.filter { if case .needsConfirm = $0.phase { true } else { false } }.count
-    }
-
-    var isBusy: Bool {
-        jobs.contains {
-            switch $0.phase {
-            case .uploading, .recognising, .confirming: true
-            default: false
-            }
-        }
     }
 
     // MARK: Start
@@ -76,33 +71,44 @@ final class ImportFlowModel {
     }
 
     func loadPending() async {
+        guard !isLoadingPending else { return }
+        isLoadingPending = true
         pendingError = nil
         do {
             let pageSize = 20
             var offset = 0
             while true {
+                try Task.checkCancellation()
                 let tasks = try await api.send(Endpoints.pendingImportTasks(limit: pageSize, offset: offset))
-                guard !Task.isCancelled else { return }
-                for task in tasks where !jobs.contains(where: { $0.taskID == task.taskId }) {
-                    jobs.append(Job(id: UUID(), taskID: task.taskId, phase: .needsConfirm(task)))
+                try Task.checkCancellation()
+                for task in tasks {
+                    if let index = jobs.firstIndex(where: { $0.taskID == task.taskId }) {
+                        if case .interrupted = jobs[index].phase { jobs[index].phase = .needsConfirm(task) }
+                    } else {
+                        jobs.append(Job(id: UUID(), taskID: task.taskId, phase: .needsConfirm(task)))
+                    }
                 }
                 if tasks.count < pageSize { break }
                 offset += tasks.count
             }
         } catch {
-            // Older servers still support continuing this device's uploads by ID.
-            if !Task.isCancelled && (error as? APIError)?.status != 405 {
+            if !Task.isCancelled {
                 pendingError = userMessage(for: error)
             }
         }
-        for taskID in pendingTaskIDs where !jobs.contains(where: { $0.taskID == taskID }) {
-            let id = UUID()
-            jobs.append(Job(id: id, taskID: taskID, phase: .recognising))
-            await poll(id, taskID: taskID)
+        isLoadingPending = false
+        guard !Task.isCancelled else { return }
+        await withTaskGroup(of: Void.self) { group in
+            for taskID in pendingTaskIDs where !jobs.contains(where: { $0.taskID == taskID }) {
+                let id = UUID()
+                jobs.append(Job(id: id, taskID: taskID, phase: .recognising))
+                group.addTask { await self.poll(id, taskID: taskID) }
+            }
         }
     }
 
     func review(_ jobID: UUID, taskID: String) async -> Wire.ImportTaskResponse? {
+        pendingError = nil
         do {
             let task = try await api.send(Endpoints.importTask(taskID))
             if task.status == "waiting_confirm" { return task }
@@ -114,6 +120,14 @@ final class ImportFlowModel {
         return nil
     }
 
+    func resume(_ job: Job) async {
+        guard let taskID = job.taskID,
+              let current = jobs.first(where: { $0.id == job.id }),
+              case .interrupted = current.phase else { return }
+        update(job.id) { $0.phase = .recognising }
+        await poll(job.id, taskID: taskID)
+    }
+
     private func run(
         _ id: UUID, image: UIImage, source: Endpoints.ImportSourceType, input: Endpoints.ImportInputType
     ) async {
@@ -122,6 +136,7 @@ final class ImportFlowModel {
         }
         do {
             let upload = try await uploader.upload(data, fileName: "\(id.uuidString).jpg", contentType: "image/jpeg")
+            guard accountGeneration == AccountLocalData.generation else { return }
             update(id) { $0.phase = .recognising }
             // The job id doubles as the idempotency key: a retried create
             // returns the same task instead of a duplicate.
@@ -154,10 +169,15 @@ final class ImportFlowModel {
                 forget(taskID)
                 update(id) { $0.phase = .failed(message ?? "没能识别这张照片，可以换一张试试") }
             case .timedOut:
-                update(id) { $0.phase = .failed("识别时间过长，稍后会在这里继续") }
+                update(id) { $0.phase = .interrupted }
             }
         } catch {
-            update(id) { $0.phase = .failed(userMessage(for: error)) }
+            if let status = (error as? APIError)?.status, status == 404 {
+                forget(taskID)
+                jobs.removeAll { $0.id == id }
+            } else {
+                update(id) { $0.phase = .interrupted }
+            }
         }
     }
 
@@ -181,8 +201,7 @@ final class ImportFlowModel {
         }
     }
 
-    /// Confirms the selected candidates. Multi-candidate tasks go through
-    /// confirm-items so a partial selection can be completed later.
+    /// Confirms selected candidates and dismisses the rest when submitted.
     func confirm(_ jobID: UUID, task: Wire.ImportTaskResponse, drafts: [CandidateDraft]) async -> Bool {
         let selected = drafts.filter { $0.include && !$0.alreadyConfirmed }
         update(jobID) { $0.phase = .confirming }
@@ -217,13 +236,8 @@ final class ImportFlowModel {
         }
     }
 
-    func dismissFinished() {
-        jobs.removeAll {
-            switch $0.phase {
-            case .done, .failed: true
-            default: false
-            }
-        }
+    func cancel(_ jobID: UUID, task: Wire.ImportTaskResponse) async -> Bool {
+        await confirm(jobID, task: task, drafts: [])
     }
 
     // MARK: Helpers
@@ -234,14 +248,17 @@ final class ImportFlowModel {
     }
 
     private var pendingTaskIDs: [String] {
-        store.stringArray(forKey: Self.pendingKey) ?? []
+        guard accountGeneration == AccountLocalData.generation else { return [] }
+        return store.stringArray(forKey: Self.pendingKey) ?? []
     }
 
     private func remember(_ taskID: String) {
+        guard accountGeneration == AccountLocalData.generation else { return }
         store.set(Array(Set(pendingTaskIDs + [taskID])), forKey: Self.pendingKey)
     }
 
     private func forget(_ taskID: String) {
+        guard accountGeneration == AccountLocalData.generation else { return }
         store.set(pendingTaskIDs.filter { $0 != taskID }, forKey: Self.pendingKey)
     }
 }
