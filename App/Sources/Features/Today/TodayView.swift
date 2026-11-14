@@ -1,132 +1,397 @@
 import AidrobeKit
 import SwiftUI
 
-/// Today V2: one outfit at a time from the user's real wardrobe, with
-/// "wear this", "another one" and structured feedback.
+/// Today reads as one page of a daily: the date, one outfit laid out from the
+/// user's own garments, why it was chosen, and a single decision to make.
 struct TodayView: View {
     @Environment(AppModel.self) private var app
     @State private var model: TodayModel?
-    @State private var index = 0
-    @State private var feedbackOutfit: Wire.OutfitResponse?
 
     var body: some View {
-        Group {
+        // ZStack, not Group: with no model yet a Group is empty and its
+        // modifiers (including the task that creates the model) attach to nothing.
+        ZStack {
             if let model {
-                content(model)
-            } else {
-                ProgressView()
+                switch model.phase {
+                case .loading:
+                    ProgressView("正在看你的衣橱…")
+                case let .failed(message):
+                    ContentUnavailableView {
+                        Label("没能拿到今天的搭配", systemImage: "wifi.exclamationmark")
+                    } description: {
+                        Text(message)
+                    } actions: {
+                        Button("再试一次") { Task { await model.load() } }
+                            .buttonStyle(.glass)
+                    }
+                case .loaded:
+                    if model.isReady {
+                        TodayPage(model: model)
+                    } else {
+                        TodayEmptyPage(guidance: model.today?.guidanceText) { await model.load() }
+                    }
+                }
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background(Color.background)
-        .navigationTitle("今日")
+        .overlay {
+            if let sky = model?.sky { WeatherLight(visual: sky) }
+        }
+        .toolbar(.hidden, for: .navigationBar)
         .task {
-            if model == nil { model = TodayModel(api: app.api) }
+            if model == nil { model = TodayModel(api: app.api, wardrobe: app.wardrobe) }
             await model?.load()
         }
     }
+}
 
-    @ViewBuilder
-    private func content(_ model: TodayModel) -> some View {
-        switch model.phase {
-        case .loading:
-            ProgressView("正在为你搭配…")
-        case let .failed(message):
-            ContentUnavailableView {
-                Label("没能拿到今日推荐", systemImage: "wifi.exclamationmark")
-            } description: {
-                Text(message)
-            } actions: {
-                Button("重试") { Task { await model.load() } }
-                    .buttonStyle(.glass)
-            }
-        case .loaded:
-            if model.isReady {
-                ready(model)
-            } else {
-                ContentUnavailableView {
-                    Label("还搭不出一套", systemImage: "hanger")
-                } description: {
-                    Text(model.today?.guidanceText ?? "先导入几件常穿的上衣和下装")
-                }
-                .refreshable { await model.load() }
-            }
+private struct TodayHeader: View {
+    let title: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(Date.now.formatted(.dateTime.month().day().weekday(.wide).locale(Locale(identifier: "zh_CN"))))
+                .kicker()
+            Text(title)
+                .font(.display(34, weight: .black, relativeTo: .largeTitle))
+                .foregroundStyle(Color.label)
         }
     }
+}
 
-    private func ready(_ model: TodayModel) -> some View {
-        let outfits = model.outfits
-        let outfit = outfits[min(index, outfits.count - 1)]
-        return ScrollView {
-            VStack(alignment: .leading, spacing: Spacing.section) {
-                if let weather = model.today?.context?.weather {
-                    Label(
-                        "\(weather.condition) · \(Int(weather.temperatureC.rounded()))°C",
-                        systemImage: "cloud.sun"
-                    )
-                    .font(.subheadline)
+private struct TodayEmptyPage: View {
+    let guidance: String?
+    let reload: () async -> Void
+    @State private var isImporting = false
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                TodayHeader(title: "还搭不出一套")
+                Text(guidance ?? "衣橱里至少要有一件上装、一件下装和一双鞋。先放进几件常穿的，明早就有搭配。")
+                    .font(.body)
                     .foregroundStyle(Color.secondaryLabel)
-                }
-                OutfitCard(outfit: outfit, model: model)
-                actions(outfit, model: model, count: outfits.count)
+                Button("添加衣物") { isImporting = true }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .padding(.top, Spacing.tight)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)
         }
-        .refreshable { await model.load() }
-        .sheet(item: $feedbackOutfit) { outfit in
-            FeedbackSheet(outfit: outfit, model: model)
-                .presentationDetents([.medium])
+        .refreshable { await reload() }
+        .sheet(isPresented: $isImporting) {
+            ImportFlowView { Task { await reload() } }
         }
-        .overlay(alignment: .bottom) { NoticeBanner(model: model) }
-        .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
+    }
+}
+
+private struct SwapTarget: Identifiable {
+    let outfit: Wire.OutfitResponse
+    let slot: BoardItem
+
+    var id: String { outfit.outfitId + slot.slotID }
+}
+
+private struct TodayPage: View {
+    let model: TodayModel
+    @State private var currentID: String?
+    @State private var swapTarget: SwapTarget?
+    @State private var feedbackOutfit: Wire.OutfitResponse?
+    @State private var showsContext = false
+
+    private var outfit: Wire.OutfitResponse {
+        model.outfits.first { $0.outfitId == currentID } ?? model.outfits[0]
     }
 
-    private func actions(_ outfit: Wire.OutfitResponse, model: TodayModel, count: Int) -> some View {
-        let worn = model.wornOutfitIDs.contains(outfit.outfitId)
-        return VStack(spacing: Spacing.control) {
-            Button {
-                Task { await model.markWorn(outfit) }
-            } label: {
-                Label(worn ? "今天就穿这套" : "穿这套", systemImage: worn ? "checkmark" : "tshirt")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.glassProminent)
-            .controlSize(.large)
-            .disabled(worn)
+    private var isWorn: Bool { model.wornOutfitIDs.contains(outfit.outfitId) }
 
-            HStack(spacing: Spacing.control) {
-                if count > 1 {
+    var body: some View {
+        // A refresh can come back empty; the parent swaps this page out, but
+        // never index into an empty list on the way.
+        if !model.outfits.isEmpty { page }
+    }
+
+    private var page: some View {
+        @Bindable var model = model
+        return ScrollView {
+            VStack(alignment: .leading, spacing: 0) {
+                header
+                    .padding(.horizontal, Spacing.screen)
+                    .padding(.top, Spacing.tight)
+                pager
+                    .padding(.top, Spacing.row)
+                VStack(alignment: .leading, spacing: Spacing.section) {
+                    caption
+                    pieces
+                    reasons
+                    prep
+                }
+                .padding(.horizontal, Spacing.screen)
+                .padding(.top, Spacing.row)
+                .padding(.bottom, Spacing.section)
+            }
+        }
+        .refreshable { await model.load() }
+        .safeAreaBar(edge: .bottom) { actionBar }
+        .scrollEdgeEffectStyle(.hard, for: .bottom)
+        .toast($model.notice)
+        .sheet(item: $swapTarget) { target in
+            SwapSheet(outfit: target.outfit, slot: target.slot, model: model)
+        }
+        .sheet(item: $feedbackOutfit) { outfit in
+            FeedbackSheet(outfit: outfit, model: model)
+        }
+        .sheet(isPresented: $showsContext) {
+            ContextSheet(model: model)
+        }
+        .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
+        .sensoryFeedback(.selection, trigger: currentID)
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: Spacing.control) {
+            HStack(alignment: .bottom) {
+                TodayHeader(title: isWorn ? "今天就这套" : "今天穿这套")
+                Spacer()
+                Button {
+                    showsContext = true
+                } label: {
+                    Image(systemName: "slider.horizontal.3")
+                        .frame(width: 28, height: 28)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("今天的情况")
+            }
+            if let line = contextLine {
+                Text(line)
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
+        }
+    }
+
+    /// Weather and any situation the user stated, in one quiet line.
+    private var contextLine: String? {
+        var parts: [String] = []
+        if let weather = model.weather {
+            parts.append("\(weather.condition) \(Int(weather.temperatureC.rounded()))°")
+            if abs(weather.feelsLikeC - weather.temperatureC) >= 2 {
+                parts.append("体感 \(Int(weather.feelsLikeC.rounded()))°")
+            }
+            if weather.rainProbability >= 0.3 {
+                parts.append("降雨 \(Int((weather.rainProbability * 100).rounded()))%")
+            }
+            if let place = weather.locationName { parts.append(place) }
+        }
+        if let chip = model.appliedChip { parts.append("已按「\(chip.title)」搭配") }
+        return parts.isEmpty ? nil : parts.joined(separator: " · ")
+    }
+
+    // MARK: Board
+
+    private var pager: some View {
+        ScrollView(.horizontal) {
+            LazyHStack(spacing: Spacing.control) {
+                ForEach(model.outfits) { outfit in
+                    OutfitBoard(items: model.boardItems(for: outfit)) { slot in
+                        swapTarget = SwapTarget(outfit: outfit, slot: slot)
+                    }
+                    .overlay(alignment: .topTrailing) { favoriteButton(outfit) }
+                    .containerRelativeFrame(.horizontal)
+                }
+            }
+            .scrollTargetLayout()
+        }
+        .contentMargins(.horizontal, Spacing.screen, for: .scrollContent)
+        .scrollTargetBehavior(.viewAligned)
+        .scrollPosition(id: $currentID)
+        .scrollIndicators(.hidden)
+    }
+
+    private func favoriteButton(_ outfit: Wire.OutfitResponse) -> some View {
+        let isFavorite = model.favoriteOutfitIDs.contains(outfit.outfitId)
+        return Button {
+            Task { await model.toggleFavorite(outfit) }
+        } label: {
+            Image(systemName: isFavorite ? "heart.fill" : "heart")
+                .font(.body)
+                .foregroundStyle(isFavorite ? Color.accent : Color.tertiaryLabel)
+                .frame(width: 44, height: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .padding(4)
+        .sensoryFeedback(.impact, trigger: isFavorite)
+        .accessibilityLabel(isFavorite ? "取消收藏" : "收藏这套")
+    }
+
+    private var caption: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .firstTextBaseline) {
+                Text(outfit.title)
+                    .font(.display(22, relativeTo: .title2))
+                    .foregroundStyle(Color.label)
+                Spacer()
+                if model.outfits.count > 1, let index = model.outfits.firstIndex(where: { $0.outfitId == outfit.outfitId }) {
+                    Text("\(index + 1) / \(model.outfits.count)")
+                        .font(.footnote.monospacedDigit())
+                        .foregroundStyle(Color.tertiaryLabel)
+                }
+            }
+            Text(outfit.reason)
+                .font(.body)
+                .foregroundStyle(Color.secondaryLabel)
+        }
+    }
+
+    // MARK: Sections
+
+    private var pieces: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            SectionHeading(title: "这一套")
+                .padding(.bottom, 4)
+            ForEach(model.boardItems(for: outfit)) { item in
+                Button {
+                    swapTarget = SwapTarget(outfit: outfit, slot: item)
+                } label: {
+                    HStack(spacing: Spacing.row) {
+                        Text(Garment.category(item.role))
+                            .font(.subheadline)
+                            .foregroundStyle(Color.tertiaryLabel)
+                            .frame(width: 52, alignment: .leading)
+                        Text(item.name)
+                            .font(.body)
+                            .foregroundStyle(Color.label)
+                            .lineLimit(1)
+                        Spacer(minLength: Spacing.tight)
+                        Text(item.isSwapped ? "已换" : "换一件")
+                            .font(.subheadline)
+                            .foregroundStyle(item.isSwapped ? Color.accent : Color.tertiaryLabel)
+                    }
+                    .frame(minHeight: 48)
+                    .contentShape(.rect)
+                }
+                .buttonStyle(.plain)
+                Divider().overlay(Color.separator)
+            }
+        }
+    }
+
+    @ViewBuilder private var reasons: some View {
+        let reasoning = outfit.reasoning ?? []
+        // What the user told us earlier and how it changed this outfit comes
+        // first and reads differently: it is the app keeping its promise.
+        let remembered = reasoning.filter { $0._type == "feedback" }
+        let others = reasoning.filter { $0._type != "feedback" }.prefix(3)
+        if !reasoning.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.control) {
+                SectionHeading(title: "为什么是这套")
+                ForEach(Array(remembered.enumerated()), id: \.offset) { _, reason in
+                    VStack(alignment: .leading, spacing: 4) {
+                        Text("记得你说过")
+                            .font(.caption.weight(.medium))
+                            .kerning(1.5)
+                            .foregroundStyle(Color.accent)
+                        Text(reason.text)
+                            .font(.body)
+                            .foregroundStyle(Color.label)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.row)
+                    .background(Color.accentSoft, in: .rect(cornerRadius: Radius.tile))
+                }
+                ForEach(Array(others.enumerated()), id: \.offset) { index, reason in
+                    HStack(alignment: .firstTextBaseline, spacing: Spacing.control) {
+                        Text("0\(index + 1)")
+                            .font(.display(15, weight: .regular, relativeTo: .subheadline))
+                            .foregroundStyle(Color.accent)
+                        Text(reason.text)
+                            .font(.body)
+                            .foregroundStyle(Color.secondaryLabel)
+                    }
+                }
+            }
+        }
+    }
+
+    @ViewBuilder private var prep: some View {
+        // "Fetch these pieces" only repeats the list above; show real preparation (ironing, drying).
+        let steps = (outfit.prepSteps ?? []).filter { $0.key != "prep.fetch_unknown" }
+        if !steps.isEmpty {
+            VStack(alignment: .leading, spacing: Spacing.control) {
+                SectionHeading(title: "出门前")
+                ForEach(steps, id: \.key) { step in
+                    Text(step.fallbackText)
+                        .font(.body)
+                        .foregroundStyle(Color.secondaryLabel)
+                }
+            }
+        }
+    }
+
+    // MARK: Actions
+
+    private var actionBar: some View {
+        GlassEffectContainer(spacing: Spacing.tight) {
+            HStack(spacing: Spacing.tight) {
+                Button {
+                    Task { await another() }
+                } label: {
+                    if model.isRefreshing {
+                        ProgressView().frame(width: 72)
+                    } else {
+                        Text(model.outfits.count > 1 ? "换一套" : "重新搭")
+                    }
+                }
+                .buttonStyle(.glass)
+                .disabled(model.isRefreshing)
+
+                if isWorn {
                     Button {
-                        withAnimation { index = (index + 1) % count }
+                        feedbackOutfit = outfit
                     } label: {
-                        Label("换一套", systemImage: "arrow.triangle.2.circlepath")
+                        Text(model.feedbackByOutfit[outfit.outfitId] == nil ? "说说穿着感受" : "已记下感受")
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glass)
-                }
-                Menu {
-                    Button("喜欢", systemImage: "heart") {
-                        Task { await model.sendFeedback(.like, reasons: [], for: outfit) }
+                } else {
+                    Button {
+                        Task { await model.markWorn(outfit) }
+                    } label: {
+                        Text("就穿这套").fontWeight(.semibold).frame(maxWidth: .infinity)
                     }
-                    Button("不太合适…", systemImage: "hand.thumbsdown") {
+                    .buttonStyle(.glassProminent)
+
+                    Button {
                         feedbackOutfit = outfit
+                    } label: {
+                        Image(systemName: "hand.thumbsdown")
                     }
-                } label: {
-                    Label(feedbackLabel(model.feedbackByOutfit[outfit.outfitId]), systemImage: "bubble.left")
-                        .frame(maxWidth: .infinity)
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .accessibilityLabel("这套不合适")
                 }
-                .buttonStyle(.glass)
             }
             .controlSize(.large)
         }
+        .padding(.horizontal, Spacing.screen)
+        .padding(.bottom, Spacing.tight)
     }
 
-    private func feedbackLabel(_ kind: FeedbackKind?) -> String {
-        switch kind {
-        case .love, .like: "已标记喜欢"
-        case .dislike: "已反馈"
-        default: "反馈"
+    /// Next prepared outfit, or a fresh set when there is only one.
+    private func another() async {
+        let outfits = model.outfits
+        guard outfits.count > 1, let index = outfits.firstIndex(where: { $0.outfitId == outfit.outfitId }) else {
+            await model.refresh(chip: model.appliedChip)
+            currentID = model.outfits.first?.outfitId
+            return
         }
+        withAnimation { currentID = outfits[(index + 1) % outfits.count].outfitId }
     }
 }
 
@@ -134,137 +399,48 @@ extension Wire.OutfitResponse: @retroactive Identifiable {
     public var id: String { outfitId }
 }
 
-private struct OutfitCard: View {
-    let outfit: Wire.OutfitResponse
-    let model: TodayModel
+/// The outfit as a flat-lay: every garment in a two-column arrangement sized
+/// by how tall the piece is. Tapping a garment offers to swap it.
+struct OutfitBoard: View {
+    let items: [BoardItem]
+    var onTap: ((BoardItem) -> Void)?
+
+    private let gap: CGFloat = 8
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.row) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text(outfit.title)
-                    .font(.title2.bold())
-                    .foregroundStyle(Color.label)
-                Text(outfit.reason)
-                    .font(.callout)
-                    .foregroundStyle(Color.secondaryLabel)
-            }
-            LazyVGrid(columns: [GridItem(.flexible()), GridItem(.flexible())], spacing: Spacing.control) {
-                ForEach(outfit.items, id: \.itemId) { item in
-                    ItemTile(url: model.imageURL(for: item), name: model.displayName(for: item))
-                }
-            }
-            if let reasoning = outfit.reasoning, !reasoning.isEmpty {
-                VStack(alignment: .leading, spacing: 6) {
-                    ForEach(Array(reasoning.prefix(3).enumerated()), id: \.offset) { _, reason in
-                        Label(reason.text, systemImage: "checkmark.circle")
-                            .font(.footnote)
-                            .foregroundStyle(Color.secondaryLabel)
-                    }
+        GeometryReader { proxy in
+            let frames = OutfitBoardLayout.frames(for: items.map(\.role))
+            ZStack(alignment: .topLeading) {
+                ForEach(Array(items.enumerated()), id: \.element.id) { index, item in
+                    tile(item, in: rect(frames[index], in: proxy.size))
                 }
             }
         }
-        .padding(Spacing.row)
-        .background(Color.elevatedBackground, in: .rect(cornerRadius: 20))
+        .padding(gap)
+        .aspectRatio(0.86, contentMode: .fit)
+        .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
+        .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
     }
-}
 
-private struct ItemTile: View {
-    let url: URL?
-    let name: String
+    /// A unit-square frame scaled to the board, inset by half the gap on every side.
+    private func rect(_ frame: OutfitBoardLayout.Frame, in size: CGSize) -> CGRect {
+        let x: CGFloat = size.width * frame.x + gap / 2
+        let y: CGFloat = size.height * frame.y + gap / 2
+        let width: CGFloat = max(0, size.width * frame.width - gap)
+        let height: CGFloat = max(0, size.height * frame.height - gap)
+        return CGRect(x: x, y: y, width: width, height: height)
+    }
 
-    var body: some View {
-        VStack(spacing: 6) {
-            AsyncImage(url: url) { phase in
-                switch phase {
-                case let .success(image):
-                    image.resizable().scaledToFit()
-                default:
-                    Image(systemName: "tshirt")
-                        .font(.largeTitle)
-                        .foregroundStyle(Color.tertiaryLabel)
-                }
-            }
-            .frame(maxWidth: .infinity, minHeight: 120, maxHeight: 140)
-            .background(Color.fill, in: .rect(cornerRadius: 12))
-            Text(name)
-                .font(.caption)
-                .foregroundStyle(Color.secondaryLabel)
-                .lineLimit(1)
+    private func tile(_ item: BoardItem, in rect: CGRect) -> some View {
+        Button {
+            onTap?(item)
+        } label: {
+            GarmentImage(url: item.imageURL)
         }
-    }
-}
-
-private struct FeedbackSheet: View {
-    let outfit: Wire.OutfitResponse
-    let model: TodayModel
-    @Environment(\.dismiss) private var dismiss
-    @State private var selected: Set<FeedbackReason> = []
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                Section("哪里不合适？") {
-                    ForEach(FeedbackReason.allCases) { reason in
-                        Toggle(reason.label, isOn: binding(for: reason))
-                    }
-                }
-            }
-            .navigationTitle("反馈")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("取消", role: .cancel) { dismiss() }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("提交") {
-                        Task {
-                            await model.sendFeedback(.dislike, reasons: Array(selected), for: outfit)
-                            dismiss()
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    private func binding(for reason: FeedbackReason) -> Binding<Bool> {
-        Binding(
-            get: { selected.contains(reason) },
-            set: { isOn in
-                if isOn { selected.insert(reason) } else { selected.remove(reason) }
-            }
-        )
-    }
-}
-
-private struct NoticeBanner: View {
-    let model: TodayModel
-
-    var body: some View {
-        if let notice = model.notice {
-            Text(notice)
-                .font(.callout)
-                .padding(.horizontal, Spacing.row)
-                .padding(.vertical, 10)
-                .glassEffect()
-                .padding(.bottom, Spacing.section)
-                .task(id: notice) {
-                    try? await Task.sleep(for: .seconds(2.5))
-                    model.notice = nil
-                }
-        }
-    }
-}
-
-extension FeedbackReason {
-    var label: String {
-        switch self {
-        case .tooWarm: "太热了"
-        case .tooCold: "太冷了"
-        case .tooFormal: "太正式"
-        case .tooCasual: "太随意"
-        case .wrongFit: "不合身"
-        case .notMyStyle: "不是我的风格"
-        }
+        .buttonStyle(.plain)
+        .disabled(onTap == nil)
+        .frame(width: rect.width, height: rect.height)
+        .offset(x: rect.minX, y: rect.minY)
+        .accessibilityLabel("\(Garment.category(item.role))，\(item.name)")
     }
 }

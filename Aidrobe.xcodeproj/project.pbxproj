@@ -7,29 +7,92 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8587F1AAA07682D6879F836A /* TodaySheets.swift */; };
+		0E2B483E16E827DF76806B3A /* ShouldIBuyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */; };
+		110BDCEBA9F515D02888274C /* PrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */; };
+		178C1D2F419675454C2C0638 /* AskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */; };
 		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
+		23A762FCBBCBB73B0697C9CA /* WeatherLight.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAD449569DE71B249DA951F5 /* WeatherLight.swift */; };
+		24BD0766FCBF271765CB3E44 /* AppleSignInButton.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53E708EC33A978E342FA8482 /* AppleSignInButton.swift */; };
+		29EC67DC179F59663C9D73CD /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */; };
+		2AC23C889C751EF68082550A /* WalkthroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */; };
+		2BCAE6DA805946BDBE8AD491 /* PackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A865C1CD5731F7DD19FCAB /* PackingModel.swift */; };
 		2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */; };
+		2F94981E4C84EB3B67DE5FBD /* ShouldIBuyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF141486CF4A14BEF02C5BE /* ShouldIBuyModel.swift */; };
 		3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7287219AD96948E57CCA4CFD /* TodayModel.swift */; };
+		3E1C100F6389EB39EC5A0EA8 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02922B5FF3319CCDA6EACCB /* JournalView.swift */; };
 		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
+		4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */; };
 		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
+		62B421215558DCBB4C11386C /* PackingListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */; };
 		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
+		80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */; };
+		8130158784309756D1586D33 /* Vocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */; };
 		97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */; };
 		9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */; };
+		A13C0DB4FE65E0B40BC177AF /* JournalModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 329CBC1021F57A493A97BCC3 /* JournalModel.swift */; };
+		A1BB27A180BF123D7B76CDE4 /* MemoryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2D99093DC0B7E362A768CD42 /* MemoryView.swift */; };
 		AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */; };
 		AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */; };
 		C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6E2559DA0C635E0639F94262 /* RootView.swift */; };
+		C2E4C587988D1E6B0781D099 /* GarmentImage.swift in Sources */ = {isa = PBXBuildFile; fileRef = 88F0A220DA8F46419E1AB257 /* GarmentImage.swift */; };
+		C75C4F50B3E3D63AF3F0517C /* OnboardingFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7D7D2EF10AE168316588D79A /* OnboardingFlowView.swift */; };
 		D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */ = {isa = PBXBuildFile; fileRef = E636373E92357B9B4DA9EB71 /* ImportDemo.swift */; };
+		D5D5C08A03BBC7FDED0C22C1 /* PackingListDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 918A2565D01694F9DC896818 /* PackingListDetailView.swift */; };
+		E070D5DFEF3476D07812B928 /* InsightsModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97D8C947AD350885E271FB8F /* InsightsModel.swift */; };
+		E09CD2767B9753C64768040D /* OutfitRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */; };
+		E7A3D7C5895AC33347E0B4D2 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A775BD53C5838DA407C7DD /* InsightsView.swift */; };
+		E9896DB0D562D55FB5F5E9A4 /* AskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F038BBD453873CAB8D0919C6 /* AskView.swift */; };
+		EAEB02680F20C50D3BC12EFC /* WeatherLight.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */; };
 		F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */; };
+		F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */; };
+		FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90100721EC7C17A012A33113 /* Components.swift */; };
 /* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		A5FF082058860D775AEC444B /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 441C51941FDA6255DD49EEC9 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = FEF48C6BBB3B950490265696;
+			remoteInfo = Aidrobe;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectLiftLab.swift; sourceTree = "<group>"; };
+		099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutfitRecordView.swift; sourceTree = "<group>"; };
+		0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingListsView.swift; sourceTree = "<group>"; };
+		0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskModel.swift; sourceTree = "<group>"; };
+		176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShouldIBuyView.swift; sourceTree = "<group>"; };
+		24A775BD53C5838DA407C7DD /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
+		2D99093DC0B7E362A768CD42 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
+		3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AidrobeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		329CBC1021F57A493A97BCC3 /* JournalModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalModel.swift; sourceTree = "<group>"; };
+		3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = WeatherLight.metal; sourceTree = "<group>"; };
 		4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
+		4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileModel.swift; sourceTree = "<group>"; };
+		51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyView.swift; sourceTree = "<group>"; };
+		53E708EC33A978E342FA8482 /* AppleSignInButton.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppleSignInButton.swift; sourceTree = "<group>"; };
 		55BD8EA5CE1B5BDDF53F3826 /* AidrobeKit */ = {isa = PBXFileReference; lastKnownFileType = folder; name = AidrobeKit; path = Packages/AidrobeKit; sourceTree = SOURCE_ROOT; };
 		6E2559DA0C635E0639F94262 /* RootView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootView.swift; sourceTree = "<group>"; };
 		6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Theme.swift; sourceTree = "<group>"; };
 		7287219AD96948E57CCA4CFD /* TodayModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayModel.swift; sourceTree = "<group>"; };
+		7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WalkthroughTests.swift; sourceTree = "<group>"; };
+		7D7D2EF10AE168316588D79A /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
+		8587F1AAA07682D6879F836A /* TodaySheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodaySheets.swift; sourceTree = "<group>"; };
+		862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		88F0A220DA8F46419E1AB257 /* GarmentImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarmentImage.swift; sourceTree = "<group>"; };
+		8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vocabulary.swift; sourceTree = "<group>"; };
+		8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WardrobeView.swift; sourceTree = "<group>"; };
+		90100721EC7C17A012A33113 /* Components.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Components.swift; sourceTree = "<group>"; };
+		918A2565D01694F9DC896818 /* PackingListDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingListDetailView.swift; sourceTree = "<group>"; };
+		97D8C947AD350885E271FB8F /* InsightsModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsModel.swift; sourceTree = "<group>"; };
+		A02922B5FF3319CCDA6EACCB /* JournalView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalView.swift; sourceTree = "<group>"; };
 		A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileView.swift; sourceTree = "<group>"; };
+		AAD449569DE71B249DA951F5 /* WeatherLight.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherLight.swift; sourceTree = "<group>"; };
+		BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WardrobeStore.swift; sourceTree = "<group>"; };
+		BAF141486CF4A14BEF02C5BE /* ShouldIBuyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShouldIBuyModel.swift; sourceTree = "<group>"; };
 		BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
 		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
@@ -37,7 +100,9 @@
 		D81E1B9AABA2CAB2B7A368DC /* WelcomeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WelcomeView.swift; sourceTree = "<group>"; };
 		E636373E92357B9B4DA9EB71 /* ImportDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDemo.swift; sourceTree = "<group>"; };
 		EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
+		F038BBD453873CAB8D0919C6 /* AskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskView.swift; sourceTree = "<group>"; };
 		F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowModel.swift; sourceTree = "<group>"; };
+		F3A865C1CD5731F7DD19FCAB /* PackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingModel.swift; sourceTree = "<group>"; };
 		FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Aidrobe.app; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
@@ -53,6 +118,15 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		152769CD33B7510E136F4A7B /* Onboarding */ = {
+			isa = PBXGroup;
+			children = (
+				53E708EC33A978E342FA8482 /* AppleSignInButton.swift */,
+				7D7D2EF10AE168316588D79A /* OnboardingFlowView.swift */,
+			);
+			path = Onboarding;
+			sourceTree = "<group>";
+		};
 		1ECCBDDAA12E32D066B7279C /* Resources */ = {
 			isa = PBXGroup;
 			children = (
@@ -73,18 +147,50 @@
 			path = Sources;
 			sourceTree = "<group>";
 		};
+		3288805770E3ED73583E1B50 /* UITests */ = {
+			isa = PBXGroup;
+			children = (
+				7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */,
+			);
+			path = UITests;
+			sourceTree = "<group>";
+		};
+		34ECCCBBB537ADD9622653EF /* Wardrobe */ = {
+			isa = PBXGroup;
+			children = (
+				862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */,
+				BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */,
+				8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */,
+			);
+			path = Wardrobe;
+			sourceTree = "<group>";
+		};
 		35D25FD5C897AFBEE2F0E66E /* Design */ = {
 			isa = PBXGroup;
 			children = (
+				90100721EC7C17A012A33113 /* Components.swift */,
+				88F0A220DA8F46419E1AB257 /* GarmentImage.swift */,
 				6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */,
+				8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */,
+				3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */,
+				AAD449569DE71B249DA951F5 /* WeatherLight.swift */,
 			);
 			path = Design;
+			sourceTree = "<group>";
+		};
+		3654CB7791101D52F2831FB4 /* Account */ = {
+			isa = PBXGroup;
+			children = (
+				51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */,
+			);
+			path = Account;
 			sourceTree = "<group>";
 		};
 		36845D461C029326607B574E /* Today */ = {
 			isa = PBXGroup;
 			children = (
 				7287219AD96948E57CCA4CFD /* TodayModel.swift */,
+				8587F1AAA07682D6879F836A /* TodaySheets.swift */,
 				D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */,
 			);
 			path = Today;
@@ -93,9 +199,19 @@
 		3C540C76B732B6B4DCD759FA /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */,
 				A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */,
 			);
 			path = Profile;
+			sourceTree = "<group>";
+		};
+		406A91D945869DAEC70DAE30 /* Ask */ = {
+			isa = PBXGroup;
+			children = (
+				0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */,
+				F038BBD453873CAB8D0919C6 /* AskView.swift */,
+			);
+			path = Ask;
 			sourceTree = "<group>";
 		};
 		49B1A008191E5A2C86AD4365 /* Config */ = {
@@ -125,12 +241,30 @@
 			path = Packages;
 			sourceTree = "<group>";
 		};
+		86ACFB48F28E24DFCE75BD1E /* Insights */ = {
+			isa = PBXGroup;
+			children = (
+				97D8C947AD350885E271FB8F /* InsightsModel.swift */,
+				24A775BD53C5838DA407C7DD /* InsightsView.swift */,
+			);
+			path = Insights;
+			sourceTree = "<group>";
+		};
 		8BAB3A6E7EE44EB2739ABEA5 /* Products */ = {
 			isa = PBXGroup;
 			children = (
 				FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */,
+				3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		A166CF55321C390B20390714 /* Memory */ = {
+			isa = PBXGroup;
+			children = (
+				2D99093DC0B7E362A768CD42 /* MemoryView.swift */,
+			);
+			path = Memory;
 			sourceTree = "<group>";
 		};
 		BDE05A2D1838802ED6CF6965 /* Import */ = {
@@ -144,14 +278,52 @@
 			path = Import;
 			sourceTree = "<group>";
 		};
+		CA8F884144DECA7AC428A9CF /* Packing */ = {
+			isa = PBXGroup;
+			children = (
+				918A2565D01694F9DC896818 /* PackingListDetailView.swift */,
+				0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */,
+				F3A865C1CD5731F7DD19FCAB /* PackingModel.swift */,
+			);
+			path = Packing;
+			sourceTree = "<group>";
+		};
 		CEA5C99BD51C2D7C6CA027DE /* Features */ = {
 			isa = PBXGroup;
 			children = (
+				3654CB7791101D52F2831FB4 /* Account */,
+				406A91D945869DAEC70DAE30 /* Ask */,
 				BDE05A2D1838802ED6CF6965 /* Import */,
+				86ACFB48F28E24DFCE75BD1E /* Insights */,
+				F09B8D39F8F7817609520476 /* Journal */,
+				A166CF55321C390B20390714 /* Memory */,
+				152769CD33B7510E136F4A7B /* Onboarding */,
+				CA8F884144DECA7AC428A9CF /* Packing */,
 				3C540C76B732B6B4DCD759FA /* Profile */,
+				F354E9DBE4289A5484B24E3E /* Shopping */,
 				36845D461C029326607B574E /* Today */,
+				34ECCCBBB537ADD9622653EF /* Wardrobe */,
 			);
 			path = Features;
+			sourceTree = "<group>";
+		};
+		F09B8D39F8F7817609520476 /* Journal */ = {
+			isa = PBXGroup;
+			children = (
+				329CBC1021F57A493A97BCC3 /* JournalModel.swift */,
+				A02922B5FF3319CCDA6EACCB /* JournalView.swift */,
+				099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */,
+			);
+			path = Journal;
+			sourceTree = "<group>";
+		};
+		F354E9DBE4289A5484B24E3E /* Shopping */ = {
+			isa = PBXGroup;
+			children = (
+				BAF141486CF4A14BEF02C5BE /* ShouldIBuyModel.swift */,
+				176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */,
+			);
+			path = Shopping;
 			sourceTree = "<group>";
 		};
 		FF3BA9829B4B7F7FB32E9F53 /* App */ = {
@@ -159,6 +331,7 @@
 			children = (
 				1ECCBDDAA12E32D066B7279C /* Resources */,
 				3080515F67A589B3151C3878 /* Sources */,
+				3288805770E3ED73583E1B50 /* UITests */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -166,6 +339,24 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		07832FC76C5FC3EAA667B04B /* AidrobeUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 2952D7477DD459A056DC9AF3 /* Build configuration list for PBXNativeTarget "AidrobeUITests" */;
+			buildPhases = (
+				3CF0AFC4B471D2BAB1C5A38F /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				48F2A2FA093B9D450456A528 /* PBXTargetDependency */,
+			);
+			name = AidrobeUITests;
+			packageProductDependencies = (
+			);
+			productName = AidrobeUITests;
+			productReference = 3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
 		FEF48C6BBB3B950490265696 /* Aidrobe */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 65923982D18E91CF34AA3580 /* Build configuration list for PBXNativeTarget "Aidrobe" */;
@@ -195,17 +386,21 @@
 				BuildIndependentTargetsInParallel = YES;
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
+					07832FC76C5FC3EAA667B04B = {
+						ProvisioningStyle = Automatic;
+						TestTargetID = FEF48C6BBB3B950490265696;
+					};
 					FEF48C6BBB3B950490265696 = {
 						ProvisioningStyle = Automatic;
 					};
 				};
 			};
 			buildConfigurationList = 5C7EF9DA5BCDE8E07D458603 /* Build configuration list for PBXProject "Aidrobe" */;
-			developmentRegion = en;
+			developmentRegion = "zh-Hans";
 			hasScannedForEncodings = 0;
 			knownRegions = (
 				Base,
-				en,
+				"zh-Hans",
 			);
 			mainGroup = 5EDD0917D6FD746E8CABBC6B;
 			minimizedProjectReferenceProxies = 1;
@@ -218,6 +413,7 @@
 			projectRoot = "";
 			targets = (
 				FEF48C6BBB3B950490265696 /* Aidrobe */,
+				07832FC76C5FC3EAA667B04B /* AidrobeUITests */,
 			);
 		};
 /* End PBXProject section */
@@ -234,27 +430,105 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		3CF0AFC4B471D2BAB1C5A38F /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				2AC23C889C751EF68082550A /* WalkthroughTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		A1D83A9A561603DAF97E365B /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
+				24BD0766FCBF271765CB3E44 /* AppleSignInButton.swift in Sources */,
+				178C1D2F419675454C2C0638 /* AskModel.swift in Sources */,
+				E9896DB0D562D55FB5F5E9A4 /* AskView.swift in Sources */,
+				FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */,
+				C2E4C587988D1E6B0781D099 /* GarmentImage.swift in Sources */,
 				D55A5CFF2106AA156751F745 /* ImportDemo.swift in Sources */,
 				2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */,
 				97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */,
+				E070D5DFEF3476D07812B928 /* InsightsModel.swift in Sources */,
+				E7A3D7C5895AC33347E0B4D2 /* InsightsView.swift in Sources */,
+				29EC67DC179F59663C9D73CD /* ItemDetailView.swift in Sources */,
+				A13C0DB4FE65E0B40BC177AF /* JournalModel.swift in Sources */,
+				3E1C100F6389EB39EC5A0EA8 /* JournalView.swift in Sources */,
+				A1BB27A180BF123D7B76CDE4 /* MemoryView.swift in Sources */,
+				C75C4F50B3E3D63AF3F0517C /* OnboardingFlowView.swift in Sources */,
+				E09CD2767B9753C64768040D /* OutfitRecordView.swift in Sources */,
+				D5D5C08A03BBC7FDED0C22C1 /* PackingListDetailView.swift in Sources */,
+				62B421215558DCBB4C11386C /* PackingListsView.swift in Sources */,
+				2BCAE6DA805946BDBE8AD491 /* PackingModel.swift in Sources */,
+				110BDCEBA9F515D02888274C /* PrivacyView.swift in Sources */,
+				4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */,
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
+				2F94981E4C84EB3B67DE5FBD /* ShouldIBuyModel.swift in Sources */,
+				0E2B483E16E827DF76806B3A /* ShouldIBuyView.swift in Sources */,
 				F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */,
 				21DB1450233AE8F381B51641 /* Theme.swift in Sources */,
 				3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */,
+				07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */,
 				9A4C6C3D19AF51E0C5671E3A /* TodayView.swift in Sources */,
+				8130158784309756D1586D33 /* Vocabulary.swift in Sources */,
+				F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */,
+				80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */,
+				EAEB02680F20C50D3BC12EFC /* WeatherLight.metal in Sources */,
+				23A762FCBBCBB73B0697C9CA /* WeatherLight.swift in Sources */,
 				AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
 
+/* Begin PBXTargetDependency section */
+		48F2A2FA093B9D450456A528 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = FEF48C6BBB3B950490265696 /* Aidrobe */;
+			targetProxy = A5FF082058860D775AEC444B /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
 /* Begin XCBuildConfiguration section */
+		72FBF178B8274212D7DCCDC8 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Aidrobe;
+			};
+			name = Release;
+		};
+		7974556C653C1BFA047765A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				GENERATE_INFOPLIST_FILE = YES;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = app.aidrobe.ios.uitests;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_TARGET_NAME = Aidrobe;
+			};
+			name = Debug;
+		};
 		7A27572D232597AC552A08EE /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */;
@@ -429,6 +703,15 @@
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
+		2952D7477DD459A056DC9AF3 /* Build configuration list for PBXNativeTarget "AidrobeUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				7974556C653C1BFA047765A4 /* Debug */,
+				72FBF178B8274212D7DCCDC8 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
 		5C7EF9DA5BCDE8E07D458603 /* Build configuration list for PBXProject "Aidrobe" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (

@@ -4,6 +4,7 @@ options:
   deploymentTarget:
     iOS: "26.0"
   createIntermediateGroups: true
+  developmentLanguage: zh-Hans
 settings:
   base:
     SWIFT_VERSION: "6.0"
@@ -39,6 +40,8 @@ targets:
       path: App/Info.plist
       properties:
         CFBundleDisplayName: 衣然
+        CFBundleDevelopmentRegion: zh-Hans
+        CFBundleLocalizations: [zh-Hans]
         UILaunchScreen:
           UIColorName: Background
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
@@ -56,7 +59,30 @@ targets:
         AIDROBE_ENABLE_V3_AVATAR: $(AIDROBE_ENABLE_V3_AVATAR)
         AIDROBE_ENABLE_V3_STATIC_TRYON: $(AIDROBE_ENABLE_V3_STATIC_TRYON)
         AIDROBE_ENABLE_V3_ANALYTICS: $(AIDROBE_ENABLE_V3_ANALYTICS)
+  AidrobeUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - App/UITests
+    dependencies:
+      - target: Aidrobe
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.aidrobe.ios.uitests
+        GENERATE_INFOPLIST_FILE: YES
+        TEST_TARGET_NAME: Aidrobe
+        CODE_SIGN_STYLE: Automatic
 schemes:
+  # Screenshot walk against the local dev stack; deliberately not in CI.
+  Walkthrough:
+    build:
+      targets:
+        Aidrobe: all
+        AidrobeUITests: [test]
+    test:
+      config: Debug
+      targets:
+        - AidrobeUITests
   Aidrobe:
     build:
       targets:

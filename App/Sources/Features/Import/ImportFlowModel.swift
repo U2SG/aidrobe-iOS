@@ -100,7 +100,7 @@ final class ImportFlowModel {
             remember(task.taskId)
             await poll(id, taskID: task.taskId)
         } catch {
-            update(id) { $0.phase = .failed(TodayModel.message(for: error)) }
+            update(id) { $0.phase = .failed(userMessage(for: error)) }
         }
     }
 
@@ -122,7 +122,7 @@ final class ImportFlowModel {
                 update(id) { $0.phase = .failed("识别时间过长，稍后会在这里继续") }
             }
         } catch {
-            update(id) { $0.phase = .failed(TodayModel.message(for: error)) }
+            update(id) { $0.phase = .failed(userMessage(for: error)) }
         }
     }
 

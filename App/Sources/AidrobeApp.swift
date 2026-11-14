@@ -5,6 +5,10 @@ import SwiftUI
 struct AidrobeApp: App {
     @State private var model = AppModel()
 
+    init() {
+        Typography.shared.install()
+    }
+
     var body: some Scene {
         WindowGroup {
             RootView()
@@ -25,6 +29,7 @@ final class AppModel {
     let environment: AppEnvironment
     let tokens: TokenStore
     let api: APIClient
+    let wardrobe: WardrobeStore
 
     private(set) var onboardingCompleted: Bool {
         didSet { UserDefaults.standard.set(onboardingCompleted, forKey: Self.onboardingKey) }
@@ -44,6 +49,7 @@ final class AppModel {
         self.api = APIClient(environment: environment, tokens: tokens) { event in
             Task { @MainActor in relay.model?.handle(event) }
         }
+        self.wardrobe = WardrobeStore(api: api)
         relay.model = self
     }
 
@@ -54,6 +60,7 @@ final class AppModel {
 
     func signOut() {
         tokens.clear()
+        wardrobe.reset()
         onboardingCompleted = false
     }
 

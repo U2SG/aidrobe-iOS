@@ -54,6 +54,8 @@ struct ImportFlowView: View {
                     }
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.groupedBackground)
             .navigationTitle("添加衣物")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -155,10 +157,6 @@ private struct ConfirmImportView: View {
     @State private var submitting = false
     @State private var failed = false
 
-    private static let categories: [(String, String)] = [
-        ("top", "上衣"), ("bottom", "下装"), ("outerwear", "外套"), ("dress", "连衣裙"), ("shoes", "鞋"),
-    ]
-
     var body: some View {
         NavigationStack {
             Form {
@@ -179,11 +177,13 @@ private struct ConfirmImportView: View {
                         .frame(maxWidth: .infinity)
                         TextField("名称", text: $draft.title)
                         Picker("类别", selection: $draft.category) {
-                            ForEach(Self.categories, id: \.0) { value, label in
-                                Text(label).tag(value)
-                            }
+                            ForEach(Garment.categories, id: \.self) { Text(Garment.category($0)).tag($0) }
                         }
-                        TextField("主色", text: $draft.color)
+                        Picker("主色", selection: $draft.color) {
+                            // Keep a recognised colour outside the palette selectable as-is.
+                            if Garment.swatch(draft.color) == nil { Text(draft.color).tag(draft.color) }
+                            ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
+                        }
                     }
                     .disabled(!draft.include || draft.alreadyConfirmed)
                 }
@@ -191,6 +191,8 @@ private struct ConfirmImportView: View {
                     Text("没能保存，请稍后再试").foregroundStyle(Color.danger)
                 }
             }
+            .scrollContentBackground(.hidden)
+            .background(Color.groupedBackground)
             .navigationTitle(drafts.count > 1 ? "识别到 \(drafts.count) 件" : "确认衣物")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
