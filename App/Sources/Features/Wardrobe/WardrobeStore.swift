@@ -15,6 +15,10 @@ final class WardrobeStore {
     private(set) var phase: Phase = .idle
     private(set) var items: [Wire.WardrobeItemResponse] = []
 
+    var hasPendingProductImages: Bool {
+        items.contains { $0.cutoutStatus == "queued" }
+    }
+
     private let api: APIClient
     private static let pageSize = 100
     private var loadID = UUID()
@@ -69,6 +73,20 @@ final class WardrobeStore {
         loadID = UUID()
         items = []
         phase = .idle
+    }
+
+    func refreshPendingProductImages() async {
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(240))
+        while hasPendingProductImages, clock.now < deadline {
+            do {
+                try await clock.sleep(for: .seconds(5))
+                try Task.checkCancellation()
+                await load()
+            } catch {
+                return
+            }
+        }
     }
 
     func update(_ id: String, _ changes: Wire.UpdateWardrobeItemRequest) async throws {

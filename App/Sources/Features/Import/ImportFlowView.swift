@@ -8,6 +8,7 @@ import SwiftUI
 struct ImportFlowView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var model: ImportFlowModel?
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showCamera = false
@@ -20,10 +21,12 @@ struct ImportFlowView: View {
     /// Photos to import as soon as the sheet opens (debug harness).
     var autoImport: [UIImage] = []
 
-    struct ConfirmTarget: Identifiable {
+    struct ConfirmTarget: Hashable {
         let jobID: UUID
         let task: Wire.ImportTaskResponse
-        var id: UUID { jobID }
+
+        static func == (lhs: Self, rhs: Self) -> Bool { lhs.jobID == rhs.jobID }
+        func hash(into hasher: inout Hasher) { hasher.combine(jobID) }
     }
 
     var body: some View {
@@ -49,26 +52,41 @@ struct ImportFlowView: View {
                     Text(inputType == .outfitImage ? "从一张穿搭照里识别多件衣物。" : "每张照片识别一件衣物。")
                 }
 
-                if let message = model?.pendingError {
-                    Section {
-                        Text(message).foregroundStyle(Color.secondaryLabel)
-                        Button("重试加载导入任务") { Task { await model?.loadPending() } }
+                if let model {
+                    let pending = model.jobs.filter { $0.pendingTask != nil }
+                    Section(pending.isEmpty ? "待确认" : "待确认（\(pending.count) 张照片）") {
+                        ForEach(pending) { job in
+                            if let task = job.pendingTask {
+                                Button {
+                                    openReview(job, model: model)
+                                } label: {
+                                    PendingImportRow(task: task, opening: openingJob == job.id)
+                                }
+                                .buttonStyle(.plain)
+                                .disabled(openingJob != nil)
+                            }
+                        }
+                        if model.isLoadingPending {
+                            HStack(spacing: Spacing.control) {
+                                ProgressView()
+                                Text("正在加载导入任务…")
+                            }
+                        } else if let message = model.pendingError {
+                            Text(message).foregroundStyle(Color.secondaryLabel)
+                            Button("重试加载导入任务") { Task { await model.loadPending() } }
+                        } else if pending.isEmpty {
+                            Text("识别完成的照片会出现在这里").foregroundStyle(Color.secondaryLabel)
+                        }
                     }
                 }
-                if let model, !model.jobs.isEmpty {
-                    Section("导入进度") {
-                        ForEach(model.jobs) { job in
-                            JobRow(job: job) {
-                                guard let taskID = job.taskID, openingJob == nil else { return }
-                                openingJob = job.id
-                                Task {
-                                    if let task = await model.review(job.id, taskID: taskID) {
-                                        confirming = ConfirmTarget(jobID: job.id, task: task)
-                                    }
-                                    openingJob = nil
-                                }
+
+                if let model {
+                    let inProgress = model.jobs.filter { $0.pendingTask == nil }
+                    if !inProgress.isEmpty {
+                        Section("导入进度") {
+                            ForEach(inProgress) { job in
+                                JobRow(job: job) { Task { await model.resume(job) } }
                             }
-                            .disabled(openingJob != nil)
                         }
                     }
                 }
@@ -92,7 +110,7 @@ struct ImportFlowView: View {
                 CameraPicker { image in model?.importImages([image], source: .camera, input: inputType) }
                     .ignoresSafeArea()
             }
-            .sheet(item: $confirming) { target in
+            .navigationDestination(item: $confirming) { target in
                 if let model {
                     ConfirmImportView(model: model, target: target) { onImported() }
                 }
@@ -104,6 +122,20 @@ struct ImportFlowView: View {
                 if !autoImport.isEmpty { model?.importImages(autoImport, source: .album) }
             }
             await model?.loadPending()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await model?.loadPending() } }
+        }
+    }
+
+    private func openReview(_ job: ImportFlowModel.Job, model: ImportFlowModel) {
+        guard let taskID = job.taskID, openingJob == nil else { return }
+        openingJob = job.id
+        Task {
+            defer { openingJob = nil }
+            if let task = await model.review(job.id, taskID: taskID) {
+                confirming = ConfirmTarget(jobID: job.id, task: task)
+            }
         }
     }
 
@@ -118,18 +150,53 @@ struct ImportFlowView: View {
     }
 }
 
+private struct PendingImportRow: View {
+    let task: Wire.ImportTaskResponse
+    let opening: Bool
+
+    private var candidates: [Wire.CandidateItem] {
+        let items = task.candidateItems?.isEmpty == false
+            ? task.candidateItems ?? []
+            : [task.candidateItem].compactMap { $0 }
+        return items.filter { $0.confirmedItemId == nil }
+    }
+
+    var body: some View {
+        HStack(spacing: Spacing.control) {
+            GarmentImage(url: task.candidateItem.flatMap { URL(string: $0.originalImageUrl) }, forceOriginal: true)
+                .frame(width: 48, height: 48)
+            VStack(alignment: .leading, spacing: 4) {
+                let names = candidates.prefix(2).map { $0.displayName ?? $0.title }
+                Text(names.isEmpty ? "识别结果" : names.joined(separator: "、"))
+                    .foregroundStyle(Color.label)
+                    .lineLimit(1)
+                Text("\(candidates.count) 件待核对")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
+            Spacer()
+            if opening {
+                ProgressView()
+            } else {
+                Image(systemName: "chevron.right")
+                    .font(.footnote.weight(.semibold))
+                    .foregroundStyle(Color.tertiaryLabel)
+            }
+        }
+        .contentShape(.rect)
+        .accessibilityElement(children: .combine)
+    }
+}
+
 private struct JobRow: View {
     let job: ImportFlowModel.Job
-    let onConfirm: () -> Void
+    let onRetry: () -> Void
 
     var body: some View {
         HStack(spacing: Spacing.control) {
             Group {
                 if let thumbnail = job.thumbnail {
                     Image(uiImage: thumbnail).resizable().scaledToFill()
-                } else if case let .needsConfirm(task) = job.phase,
-                          let candidate = task.candidateItem {
-                    GarmentImage(url: URL(string: candidate.cropImageUrl ?? candidate.originalImageUrl), forceOriginal: true)
                 } else {
                     Image(systemName: "photo").foregroundStyle(Color.tertiaryLabel)
                 }
@@ -153,10 +220,10 @@ private struct JobRow: View {
                 ProgressView()
                 Text("识别中…").foregroundStyle(Color.secondaryLabel)
             }
-        case let .needsConfirm(task):
-            let count = (task.candidateItems ?? []).filter { $0.confirmedItemId == nil }.count
-            Button(count > 1 ? "核对 \(count) 件衣物" : "确认识别结果", action: onConfirm)
-                .buttonStyle(.glassProminent)
+        case .interrupted:
+            Button("继续查看识别进度", action: onRetry)
+        case .needsConfirm:
+            EmptyView()
         case .confirming:
             ProgressView()
         case let .done(count):
@@ -180,60 +247,64 @@ private struct ConfirmImportView: View {
     @State private var drafts: [ImportFlowModel.CandidateDraft] = []
     @State private var submitting = false
     @State private var failed = false
+    @State private var showCancel = false
 
     private var selected: [ImportFlowModel.CandidateDraft] {
         drafts.filter { $0.include && !$0.alreadyConfirmed }
     }
 
     var body: some View {
-        NavigationStack {
-            Form {
-                ForEach($drafts) { $draft in
-                    Section {
-                        if draft.alreadyConfirmed {
-                            Label("已在衣橱中", systemImage: "checkmark.circle.fill")
-                                .foregroundStyle(Color.success)
-                        } else {
-                            Toggle(
-                                draft.possibleDuplicates.isEmpty ? "导入这件" : "仍然导入",
-                                isOn: $draft.include
-                            )
-                        }
-                        if draft.possibleDuplicates.isEmpty {
-                            GarmentImage(url: draft.imageURL, forceOriginal: true)
-                                .frame(height: 180)
-                        } else {
-                            ForEach(draft.possibleDuplicates, id: \.itemId) { match in
-                                VStack(alignment: .leading, spacing: Spacing.tight) {
-                                    Label("可能已在衣橱", systemImage: "square.on.square")
-                                        .font(.subheadline)
-                                    HStack(alignment: .top, spacing: Spacing.control) {
-                                        comparison("本次识别", url: draft.imageURL)
-                                        comparison(match.title, url: match.imageUrl.flatMap(URL.init(string:)))
-                                    }
-                                }
-                            }
-                        }
-                        Group {
-                            TextField("名称", text: $draft.title)
-                            Picker("类别", selection: $draft.category) {
-                                if !Garment.categories.contains(draft.category) {
-                                    Text(Garment.category(draft.category)).tag(draft.category)
-                                }
-                                ForEach(Garment.categories, id: \.self) { Text(Garment.category($0)).tag($0) }
-                            }
-                            Picker("主色", selection: $draft.color) {
-                                if Garment.swatch(draft.color) == nil { Text(draft.color).tag(draft.color) }
-                                ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
-                            }
-                        }
-                        .disabled(!draft.include || draft.alreadyConfirmed)
+        Form {
+            Section {
+                Button("取消确认", role: .destructive) { showCancel = true }
+                    .disabled(submitting)
+            }
+            ForEach($drafts) { $draft in
+                Section {
+                    if draft.alreadyConfirmed {
+                        Label("已在衣橱中", systemImage: "checkmark.circle.fill")
+                            .foregroundStyle(Color.success)
+                    } else {
+                        Toggle(
+                            draft.possibleDuplicates.isEmpty ? "导入这件" : "仍然导入",
+                            isOn: $draft.include
+                        )
                     }
-                }
-                if failed {
-                    Text("没能保存，请稍后再试").foregroundStyle(Color.danger)
+                    if draft.possibleDuplicates.isEmpty {
+                        GarmentImage(url: draft.imageURL, forceOriginal: true)
+                            .frame(height: 180)
+                    } else {
+                        ForEach(draft.possibleDuplicates, id: \.itemId) { match in
+                            VStack(alignment: .leading, spacing: Spacing.tight) {
+                                Label("可能已在衣橱", systemImage: "square.on.square")
+                                    .font(.subheadline)
+                                HStack(alignment: .top, spacing: Spacing.control) {
+                                    comparison("本次识别", url: draft.imageURL)
+                                    comparison(match.title, url: match.imageUrl.flatMap(URL.init(string:)))
+                                }
+                            }
+                        }
+                    }
+                    Group {
+                        TextField("名称", text: $draft.title)
+                        Picker("类别", selection: $draft.category) {
+                            if !Garment.categories.contains(draft.category) {
+                                Text(Garment.category(draft.category)).tag(draft.category)
+                            }
+                            ForEach(Garment.categories, id: \.self) { Text(Garment.category($0)).tag($0) }
+                        }
+                        Picker("主色", selection: $draft.color) {
+                            if Garment.swatch(draft.color) == nil { Text(draft.color).tag(draft.color) }
+                            ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
+                        }
+                    }
+                    .disabled(!draft.include || draft.alreadyConfirmed)
                 }
             }
+            if failed {
+                Text("没能保存，请稍后再试").foregroundStyle(Color.danger)
+            }
+        }
             .scrollContentBackground(.hidden)
             .background(Color.groupedBackground)
             .navigationTitle(drafts.count > 1 ? "识别到 \(drafts.count) 件" : "确认衣物")
@@ -244,28 +315,41 @@ private struct ConfirmImportView: View {
                         .disabled(submitting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button(selected.isEmpty ? "跳过全部" : "加入衣橱") {
+                    Button("加入衣橱") {
                         submitting = true
-                        let didSelect = !selected.isEmpty
                         Task {
                             let ok = await model.confirm(target.jobID, task: target.task, drafts: drafts)
                             submitting = false
                             if ok {
-                                if didSelect { onImported() }
+                                onImported()
                                 dismiss()
                             } else {
                                 failed = true
                             }
                         }
                     }
-                    .disabled(submitting || drafts.isEmpty || selected.contains {
+                    .disabled(submitting || selected.isEmpty || selected.contains {
                         $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
                     })
                 }
             }
-        }
-        .interactiveDismissDisabled(submitting)
-        .onAppear { drafts = model.drafts(for: target.task) }
+            .navigationBarBackButtonHidden()
+            .alert("取消这次确认？", isPresented: $showCancel) {
+                Button("继续核对", role: .cancel) {}
+                Button("取消确认", role: .destructive) {
+                    submitting = true
+                    Task {
+                        let ok = await model.cancel(target.jobID, task: target.task)
+                        submitting = false
+                        if ok { dismiss() } else { failed = true }
+                    }
+                }
+            } message: {
+                Text("这张照片里还没确认的衣物将从待确认列表移除。")
+            }
+            .onAppear {
+                if drafts.isEmpty { drafts = model.drafts(for: target.task) }
+            }
     }
 
     private func comparison(_ title: String, url: URL?) -> some View {

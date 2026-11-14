@@ -79,6 +79,7 @@ struct WardrobeView: View {
         }
         .toast($notice)
         .task { await store.load() }
+        .task(id: store.hasPendingProductImages) { await store.refreshPendingProductImages() }
     }
 
     private var catalogue: some View {
@@ -166,7 +167,7 @@ private struct WardrobeTile: View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
             GarmentImage(
                 url: WardrobeStore.imageURL(item),
-                forceOriginal: item.cutoutStatus == "ready",
+                forceOriginal: item.cutoutStatus == "ready" || item.cutoutStatus == "queued",
                 fit: item.cutoutStatus == "ready"
             )
                 .aspectRatio(0.8, contentMode: .fit)
@@ -188,6 +189,7 @@ private struct WardrobeTile: View {
 
     private var detail: String {
         if item.status != .wearable { return Garment.status(item.status) }
+        if item.cutoutStatus == "queued" { return "正在生成商品图…" }
         let wears = item.wearCount ?? 0
         return wears == 0 ? Garment.color(item.colorMain) : "\(Garment.color(item.colorMain)) · 穿过 \(wears) 次"
     }

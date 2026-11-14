@@ -152,7 +152,7 @@ enum AccountLocalData {
 
     @MainActor static func clear() {
         generation = UUID()
-        for key in [purchaseHistoryKey, wornTodayKey, placeNameKey] {
+        for key in [purchaseHistoryKey, wornTodayKey, placeNameKey, ImportFlowModel.pendingKey] {
             UserDefaults.standard.removeObject(forKey: key)
         }
     }

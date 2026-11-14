@@ -31,10 +31,9 @@ struct ItemDetailView: View {
     private func page(_ item: Wire.WardrobeItemResponse) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
-                // The cover may be a server-made cutout; "original" is always the user's own photo.
                 GarmentImage(
                     url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
-                    forceOriginal: showsOriginal || item.cutoutStatus == "ready",
+                    forceOriginal: showsOriginal || item.cutoutStatus == "ready" || item.cutoutStatus == "queued",
                     fit: showsOriginal || item.cutoutStatus == "ready"
                 )
                     .aspectRatio(1, contentMode: .fit)
@@ -42,12 +41,19 @@ struct ItemDetailView: View {
                     .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
                     .overlay(alignment: .bottomTrailing) {
                         if prefersCutout || item.coverImageUrl != item.originalImageUrl {
-                            Button(showsOriginal ? "看抠图" : "看原图") { showsOriginal.toggle() }
+                            Button(showsOriginal ? (item.cutoutStatus == "ready" ? "看商品图" : "看封面") : "看原图") {
+                                showsOriginal.toggle()
+                            }
                                 .font(.footnote)
                                 .buttonStyle(.glass)
                                 .padding(Spacing.control)
                         }
                     }
+                if item.cutoutStatus == "queued" {
+                    Label("正在生成商品图…", systemImage: "sparkles")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                }
                 VStack(alignment: .leading, spacing: 6) {
                     Text(item.displayName)
                         .font(.display(28, weight: .black, relativeTo: .title))
