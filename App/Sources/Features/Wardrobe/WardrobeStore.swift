@@ -16,6 +16,7 @@ final class WardrobeStore {
     private(set) var items: [Wire.WardrobeItemResponse] = []
 
     private let api: APIClient
+    private static let pageSize = 100
 
     init(api: APIClient) {
         self.api = api
@@ -40,7 +41,15 @@ final class WardrobeStore {
     func load() async {
         if items.isEmpty { phase = .loading }
         do {
-            items = try await api.send(Endpoints.wardrobeItems()).items
+            // Every screen treats a missing id as "no longer in the wardrobe", so
+            // the store must hold all of it, not just the first page.
+            var loaded: [Wire.WardrobeItemResponse] = []
+            while true {
+                let page = try await api.send(Endpoints.wardrobeItems(limit: Self.pageSize, offset: loaded.count))
+                loaded += page.items
+                if page.items.isEmpty || loaded.count >= page.total { break }
+            }
+            items = loaded
             phase = .loaded
         } catch {
             if items.isEmpty { phase = .failed(userMessage(for: error)) }

@@ -48,7 +48,7 @@ final class ShouldIBuyModel {
 
     private let api: APIClient
     private let uploader: PresignedUploader
-    private static let historyKey = "aidrobe.shopping.asked"
+    private static let historyKey = AccountLocalData.purchaseHistoryKey
 
     init(api: APIClient) {
         self.api = api

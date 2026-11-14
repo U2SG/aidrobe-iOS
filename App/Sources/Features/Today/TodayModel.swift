@@ -214,7 +214,7 @@ final class TodayModel {
 /// page still says so after a relaunch (the recommendation payload doesn't).
 /// Keyed by the server's `recommendation_date`, never the device's idea of today.
 private struct WornLedger {
-    private static let key = "aidrobe.today.worn"
+    private static let key = AccountLocalData.wornTodayKey
 
     func outfits(on day: String) -> Set<String> {
         let stored = UserDefaults.standard.dictionary(forKey: Self.key) as? [String: [String]]

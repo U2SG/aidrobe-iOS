@@ -5,7 +5,7 @@ struct ProfileView: View {
     @Environment(AppModel.self) private var app
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @AppStorage(Preferences.appearanceKey) private var appearance = "system"
-    @AppStorage("aidrobe.settings.placeName") private var placeName = ""
+    @AppStorage(AccountLocalData.placeNameKey) private var placeName = ""
     @State private var model: ProfileModel?
 
     var body: some View {

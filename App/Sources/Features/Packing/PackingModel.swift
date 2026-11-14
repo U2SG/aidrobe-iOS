@@ -72,6 +72,9 @@ final class PackingModel {
     private(set) var lists: [Wire.PackingListResponse] = []
     private(set) var isCreating = false
     var notice: String?
+    /// Lists with a save in flight, and lists edited since that save was sent.
+    private var saving: Set<String> = []
+    private var unsaved: Set<String> = []
 
     private let api: APIClient
 
@@ -118,25 +121,39 @@ final class PackingModel {
         }
     }
 
-    /// Ticks a garment for every day it is worn. Optimistic; rolls back on failure.
+    /// Ticks a garment for every day it is worn. Shown at once; saved one
+    /// request at a time per list, because each save replaces the whole item
+    /// list — ticks made while one is in flight go out together in the next.
     func setPacked(_ packed: Bool, itemID: String, in listID: String) async {
         guard let index = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
-        let before = lists[index]
-        var items = before.items
-        for row in items.indices where items[row].itemId == itemID { items[row].packed = packed }
-        lists[index].items = items
-        do {
-            let saved = try await api.send(Endpoints.updatePackingList(listID, items: items))
-            // Keep the plan we already have if the update response leaves it out.
-            if let current = lists.firstIndex(where: { $0.packingListId == listID }) {
-                var merged = saved
-                if merged.plan == nil { merged.plan = before.plan }
-                lists[current] = merged
-            }
-        } catch {
-            if let current = lists.firstIndex(where: { $0.packingListId == listID }) { lists[current] = before }
-            notice = userMessage(for: error)
+        var confirmed = lists[index]
+        for row in lists[index].items.indices where lists[index].items[row].itemId == itemID {
+            lists[index].items[row].packed = packed
         }
+        guard saving.insert(listID).inserted else {
+            unsaved.insert(listID)
+            return
+        }
+        defer { saving.remove(listID) }
+        repeat {
+            unsaved.remove(listID)
+            guard let current = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
+            do {
+                var saved = try await api.send(Endpoints.updatePackingList(listID, items: lists[current].items))
+                // Keep the plan we already have if the update response leaves it out.
+                if saved.plan == nil { saved.plan = confirmed.plan }
+                confirmed = saved
+                // Newer ticks are still only local; don't overwrite them with this response.
+                if !unsaved.contains(listID), let latest = lists.firstIndex(where: { $0.packingListId == listID }) {
+                    lists[latest] = saved
+                }
+            } catch {
+                unsaved.remove(listID)
+                if let latest = lists.firstIndex(where: { $0.packingListId == listID }) { lists[latest] = confirmed }
+                notice = userMessage(for: error)
+                return
+            }
+        } while unsaved.contains(listID)
     }
 
     /// `yyyy-MM-dd` in the user's calendar (a departure date is a calendar day, not an instant).

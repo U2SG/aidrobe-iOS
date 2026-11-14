@@ -151,7 +151,7 @@ private struct ClothesStep: View {
 private struct RoutineStep: View {
     let next: () -> Void
     @Environment(AppModel.self) private var app
-    @AppStorage("aidrobe.settings.placeName") private var placeName = ""
+    @AppStorage(AccountLocalData.placeNameKey) private var placeName = ""
     @State private var model: ProfileModel?
 
     var body: some View {
