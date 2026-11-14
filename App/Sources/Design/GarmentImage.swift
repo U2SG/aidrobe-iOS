@@ -93,6 +93,7 @@ actor GarmentImagePipeline {
 struct GarmentImage: View {
     let url: URL?
     var forceOriginal = false
+    var fit = false
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @State private var render: GarmentRender?
 
@@ -128,7 +129,7 @@ struct GarmentPicture: View {
                     } else {
                         Image(uiImage: render.image)
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: fit ? .fit : .fill)
                     }
                 }
             }

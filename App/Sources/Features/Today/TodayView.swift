@@ -101,6 +101,9 @@ private struct TodayPage: View {
     @State private var feedbackOutfit: Wire.OutfitResponse?
     @State private var showsContext = false
     @State private var shareDraft: OutfitShareDraft?
+    @State private var generationTarget: Wire.OutfitResponse?
+    @State private var showsGenerationConfirm = false
+    @State private var showPieces: Set<String> = []
 
     private var outfit: Wire.OutfitResponse {
         model.outfits.first { $0.outfitId == currentID } ?? model.outfits[0]
@@ -138,6 +141,7 @@ private struct TodayPage: View {
         .safeAreaBar(edge: .bottom) { actionBar }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .toast($model.notice)
+        .task(id: outfit.outfitId) { await model.loadGeneratedImage(for: outfit.outfitId) }
         .sheet(item: $swapTarget) { target in
             SwapSheet(outfit: target.outfit, slot: target.slot, model: model)
         }
@@ -149,6 +153,11 @@ private struct TodayPage: View {
         }
         .sheet(item: $shareDraft) { draft in
             OutfitShareSheet(draft: draft)
+        }
+        .confirmationDialog("生成整套搭配图", isPresented: $showsGenerationConfirm, presenting: generationTarget) { outfit in
+            Button("生成") { Task { await model.generateImage(for: outfit) } }
+        } message: { _ in
+            Text("会把这套搭配的衣物参考图发送给 OpenAI。生成图里的颜色和细节可能有变化。")
         }
         .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
         .sensoryFeedback(.selection, trigger: currentID)
@@ -202,25 +211,47 @@ private struct TodayPage: View {
         ScrollView(.horizontal) {
             LazyHStack(spacing: Spacing.control) {
                 ForEach(model.outfits) { outfit in
-                    OutfitBoard(items: model.boardItems(for: outfit)) { slot in
-                        swapTarget = SwapTarget(outfit: outfit, slot: slot)
-                    }
-                    .overlay(alignment: .topTrailing) {
-                        HStack(spacing: 0) {
-                            Button {
-                                shareDraft = OutfitShareDraft(
-                                    items: model.boardItems(for: outfit),
-                                    date: Garment.day(model.today?.recommendationDate)
-                                )
-                            } label: {
-                                Image(systemName: "square.and.arrow.up")
-                                    .foregroundStyle(Color.secondaryLabel)
-                                    .frame(width: 44, height: 44)
-                                    .contentShape(.rect)
+                    let items = model.boardItems(for: outfit)
+                    let hasSwaps = items.contains(where: \.isSwapped)
+                    VStack(alignment: .leading, spacing: Spacing.tight) {
+                        outfitPreview(outfit, items: items, hasSwaps: hasSwaps)
+                            .overlay(alignment: .topTrailing) {
+                                HStack(spacing: 0) {
+                                    Button {
+                                        shareDraft = OutfitShareDraft(
+                                            items: items,
+                                            date: Garment.day(model.today?.recommendationDate)
+                                        )
+                                    } label: {
+                                        Image(systemName: "square.and.arrow.up")
+                                            .foregroundStyle(Color.secondaryLabel)
+                                            .frame(width: 44, height: 44)
+                                            .contentShape(.rect)
+                                    }
+                                    .buttonStyle(.plain)
+                                    .accessibilityLabel("分享这套")
+                                    favoriteButton(outfit)
+                                }
                             }
-                            .buttonStyle(.plain)
-                            .accessibilityLabel("分享这套")
-                            favoriteButton(outfit)
+
+                        if model.generatingOutfits.contains(outfit.outfitId) {
+                            HStack {
+                                ProgressView()
+                                Text("正在生成整套搭配图…").font(.footnote)
+                            }
+                        } else if !hasSwaps {
+                            if model.generatedImages[outfit.outfitId] == nil {
+                                Button("生成整套搭配图", systemImage: "sparkles") {
+                                    generationTarget = outfit
+                                    showsGenerationConfirm = true
+                                }
+                            } else {
+                                Button(showPieces.contains(outfit.outfitId) ? "看生成图" : "看单品") {
+                                    if !showPieces.insert(outfit.outfitId).inserted {
+                                        showPieces.remove(outfit.outfitId)
+                                    }
+                                }
+                            }
                         }
                     }
                     .containerRelativeFrame(.horizontal)
@@ -232,6 +263,20 @@ private struct TodayPage: View {
         .scrollTargetBehavior(.viewAligned)
         .scrollPosition(id: $currentID)
         .scrollIndicators(.hidden)
+    }
+
+    @ViewBuilder
+    private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem], hasSwaps: Bool) -> some View {
+        if let image = model.generatedImages[outfit.outfitId],
+           !hasSwaps, !showPieces.contains(outfit.outfitId) {
+            GarmentImage(url: image, forceOriginal: true, fit: true)
+                .aspectRatio(0.86, contentMode: .fit)
+                .accessibilityLabel("AI 生成的整套搭配图")
+        } else {
+            OutfitBoard(items: items) { slot in
+                swapTarget = SwapTarget(outfit: outfit, slot: slot)
+            }
+        }
     }
 
     private func favoriteButton(_ outfit: Wire.OutfitResponse) -> some View {
@@ -459,13 +504,13 @@ struct OutfitBoard: View {
                 Button {
                     onTap(item)
                 } label: {
-                    GarmentImage(url: item.imageURL)
+                    GarmentImage(url: item.imageURL, forceOriginal: item.usesGeneratedCover)
                 }
                 .buttonStyle(.plain)
             } else if let pictures {
                 GarmentPicture(render: pictures[item.id])
             } else {
-                GarmentImage(url: item.imageURL)
+                GarmentImage(url: item.imageURL, forceOriginal: item.usesGeneratedCover)
             }
         }
         .frame(width: rect.width, height: rect.height)

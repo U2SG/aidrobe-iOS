@@ -164,7 +164,11 @@ private struct WardrobeTile: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
-            GarmentImage(url: WardrobeStore.imageURL(item))
+            GarmentImage(
+                url: WardrobeStore.imageURL(item),
+                forceOriginal: item.cutoutStatus == "ready",
+                fit: item.cutoutStatus == "ready"
+            )
                 .aspectRatio(0.8, contentMode: .fit)
                 .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.tile))
                 .overlay(RoundedRectangle(cornerRadius: Radius.tile).strokeBorder(Color.separator))

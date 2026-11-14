@@ -8,6 +8,20 @@ public enum Endpoints {
         Endpoint(.get, "/v1/recommendations/today", timeout: Endpoint<Wire.TodayRecommendationResponse>.slowTimeout)
     }
 
+    public static func generateOutfitImage(_ outfitID: String) -> Endpoint<Wire.OutfitVisualAssetResponse> {
+        Endpoint(.post, "/v1/outfits/\(outfitID)/share-asset", query: [
+            URLQueryItem(name: "generate", value: "true"),
+        ])
+    }
+
+    public static func generatedOutfitImage(_ outfitID: String) -> Endpoint<Wire.OutfitVisualAssetResponse> {
+        Endpoint(.get, "/v1/outfits/\(outfitID)/share-asset")
+    }
+
+    public static func outfitVisual(_ assetID: String) -> Endpoint<Wire.OutfitVisualAssetResponse> {
+        Endpoint(.get, "/v1/outfit-visual-assets/\(assetID)")
+    }
+
     public static func markWorn(outfitID: String, wornDate: String? = nil) throws -> Endpoint<EmptyResponse> {
         try Endpoint(
             .post,

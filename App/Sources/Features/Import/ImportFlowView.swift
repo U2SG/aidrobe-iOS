@@ -11,6 +11,8 @@ struct ImportFlowView: View {
     @State private var model: ImportFlowModel?
     @State private var pickerItems: [PhotosPickerItem] = []
     @State private var showCamera = false
+    @State private var inputType: Endpoints.ImportInputType = .image
+    @State private var openingJob: UUID?
     @State private var confirming: ConfirmTarget?
 
     /// Called after at least one item was added, so the caller can refresh.
@@ -28,6 +30,11 @@ struct ImportFlowView: View {
         NavigationStack {
             List {
                 Section {
+                    Picker("照片类型", selection: $inputType) {
+                        Text("单件衣物").tag(Endpoints.ImportInputType.image)
+                        Text("整套穿搭").tag(Endpoints.ImportInputType.outfitImage)
+                    }
+                    .pickerStyle(.segmented)
                     PhotosPicker(selection: $pickerItems, maxSelectionCount: 9, matching: .images) {
                         Label("从相册选择", systemImage: "photo.on.rectangle")
                     }
@@ -39,17 +46,29 @@ struct ImportFlowView: View {
                         }
                     }
                 } footer: {
-                    Text("每张照片识别一件衣物；平铺或挂着拍，识别更准。")
+                    Text(inputType == .outfitImage ? "从一张穿搭照里识别多件衣物。" : "每张照片识别一件衣物。")
                 }
 
+                if let message = model?.pendingError {
+                    Section {
+                        Text(message).foregroundStyle(Color.secondaryLabel)
+                        Button("重试加载导入任务") { Task { await model?.loadPending() } }
+                    }
+                }
                 if let model, !model.jobs.isEmpty {
                     Section("导入进度") {
                         ForEach(model.jobs) { job in
                             JobRow(job: job) {
-                                if case let .needsConfirm(task) = job.phase {
-                                    confirming = ConfirmTarget(jobID: job.id, task: task)
+                                guard let taskID = job.taskID, openingJob == nil else { return }
+                                openingJob = job.id
+                                Task {
+                                    if let task = await model.review(job.id, taskID: taskID) {
+                                        confirming = ConfirmTarget(jobID: job.id, task: task)
+                                    }
+                                    openingJob = nil
                                 }
                             }
+                            .disabled(openingJob != nil)
                         }
                     }
                 }
@@ -66,10 +85,11 @@ struct ImportFlowView: View {
             .onChange(of: pickerItems) { _, items in
                 guard !items.isEmpty else { return }
                 pickerItems = []
-                Task { await load(items) }
+                let input = inputType
+                Task { await load(items, input: input) }
             }
             .fullScreenCover(isPresented: $showCamera) {
-                CameraPicker { image in model?.importImages([image], source: .camera) }
+                CameraPicker { image in model?.importImages([image], source: .camera, input: inputType) }
                     .ignoresSafeArea()
             }
             .sheet(item: $confirming) { target in
@@ -83,18 +103,18 @@ struct ImportFlowView: View {
                 model = ImportFlowModel(api: app.api)
                 if !autoImport.isEmpty { model?.importImages(autoImport, source: .album) }
             }
-            await model?.resumePending()
+            await model?.loadPending()
         }
     }
 
-    private func load(_ items: [PhotosPickerItem]) async {
+    private func load(_ items: [PhotosPickerItem], input: Endpoints.ImportInputType) async {
         var images: [UIImage] = []
         for item in items {
             if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
                 images.append(image)
             }
         }
-        model?.importImages(images, source: .album)
+        model?.importImages(images, source: .album, input: input)
     }
 }
 
@@ -107,6 +127,9 @@ private struct JobRow: View {
             Group {
                 if let thumbnail = job.thumbnail {
                     Image(uiImage: thumbnail).resizable().scaledToFill()
+                } else if case let .needsConfirm(task) = job.phase,
+                          let candidate = task.candidateItem {
+                    GarmentImage(url: URL(string: candidate.cropImageUrl ?? candidate.originalImageUrl), forceOriginal: true)
                 } else {
                     Image(systemName: "photo").foregroundStyle(Color.tertiaryLabel)
                 }
@@ -130,8 +153,9 @@ private struct JobRow: View {
                 ProgressView()
                 Text("识别中…").foregroundStyle(Color.secondaryLabel)
             }
-        case .needsConfirm:
-            Button("确认识别结果", action: onConfirm)
+        case let .needsConfirm(task):
+            let count = (task.candidateItems ?? []).filter { $0.confirmedItemId == nil }.count
+            Button(count > 1 ? "核对 \(count) 件衣物" : "确认识别结果", action: onConfirm)
                 .buttonStyle(.glassProminent)
         case .confirming:
             ProgressView()
@@ -157,6 +181,10 @@ private struct ConfirmImportView: View {
     @State private var submitting = false
     @State private var failed = false
 
+    private var selected: [ImportFlowModel.CandidateDraft] {
+        drafts.filter { $0.include && !$0.alreadyConfirmed }
+    }
+
     var body: some View {
         NavigationStack {
             Form {
@@ -165,27 +193,42 @@ private struct ConfirmImportView: View {
                         if draft.alreadyConfirmed {
                             Label("已在衣橱中", systemImage: "checkmark.circle.fill")
                                 .foregroundStyle(Color.success)
-                        } else if drafts.count > 1 {
-                            Toggle("导入这件", isOn: $draft.include)
+                        } else {
+                            Toggle(
+                                draft.possibleDuplicates.isEmpty ? "导入这件" : "仍然导入",
+                                isOn: $draft.include
+                            )
                         }
-                        AsyncImage(url: draft.imageURL) { image in
-                            image.resizable().scaledToFit()
-                        } placeholder: {
-                            Color.fill
+                        if draft.possibleDuplicates.isEmpty {
+                            GarmentImage(url: draft.imageURL, forceOriginal: true)
+                                .frame(height: 180)
+                        } else {
+                            ForEach(draft.possibleDuplicates, id: \.itemId) { match in
+                                VStack(alignment: .leading, spacing: Spacing.tight) {
+                                    Label("可能已在衣橱", systemImage: "square.on.square")
+                                        .font(.subheadline)
+                                    HStack(alignment: .top, spacing: Spacing.control) {
+                                        comparison("本次识别", url: draft.imageURL)
+                                        comparison(match.title, url: match.imageUrl.flatMap(URL.init(string:)))
+                                    }
+                                }
+                            }
                         }
-                        .frame(maxHeight: 180)
-                        .frame(maxWidth: .infinity)
-                        TextField("名称", text: $draft.title)
-                        Picker("类别", selection: $draft.category) {
-                            ForEach(Garment.categories, id: \.self) { Text(Garment.category($0)).tag($0) }
+                        Group {
+                            TextField("名称", text: $draft.title)
+                            Picker("类别", selection: $draft.category) {
+                                if !Garment.categories.contains(draft.category) {
+                                    Text(Garment.category(draft.category)).tag(draft.category)
+                                }
+                                ForEach(Garment.categories, id: \.self) { Text(Garment.category($0)).tag($0) }
+                            }
+                            Picker("主色", selection: $draft.color) {
+                                if Garment.swatch(draft.color) == nil { Text(draft.color).tag(draft.color) }
+                                ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
+                            }
                         }
-                        Picker("主色", selection: $draft.color) {
-                            // Keep a recognised colour outside the palette selectable as-is.
-                            if Garment.swatch(draft.color) == nil { Text(draft.color).tag(draft.color) }
-                            ForEach(Garment.colors, id: \.key) { Text($0.label).tag($0.key) }
-                        }
+                        .disabled(!draft.include || draft.alreadyConfirmed)
                     }
-                    .disabled(!draft.include || draft.alreadyConfirmed)
                 }
                 if failed {
                     Text("没能保存，请稍后再试").foregroundStyle(Color.danger)
@@ -198,26 +241,42 @@ private struct ConfirmImportView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("稍后", role: .cancel) { dismiss() }
+                        .disabled(submitting)
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("加入衣橱") {
+                    Button(selected.isEmpty ? "跳过全部" : "加入衣橱") {
                         submitting = true
+                        let didSelect = !selected.isEmpty
                         Task {
                             let ok = await model.confirm(target.jobID, task: target.task, drafts: drafts)
                             submitting = false
                             if ok {
-                                onImported()
+                                if didSelect { onImported() }
                                 dismiss()
                             } else {
                                 failed = true
                             }
                         }
                     }
-                    .disabled(submitting || !drafts.contains { $0.include && !$0.title.isEmpty })
+                    .disabled(submitting || drafts.isEmpty || selected.contains {
+                        $0.title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    })
                 }
             }
         }
+        .interactiveDismissDisabled(submitting)
         .onAppear { drafts = model.drafts(for: target.task) }
+    }
+
+    private func comparison(_ title: String, url: URL?) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            GarmentImage(url: url, forceOriginal: true)
+                .frame(height: 115)
+            Text(title)
+                .font(.caption)
+                .foregroundStyle(Color.secondaryLabel)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 

@@ -34,7 +34,8 @@ struct ItemDetailView: View {
                 // The cover may be a server-made cutout; "original" is always the user's own photo.
                 GarmentImage(
                     url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
-                    forceOriginal: showsOriginal
+                    forceOriginal: showsOriginal || item.cutoutStatus == "ready",
+                    fit: showsOriginal || item.cutoutStatus == "ready"
                 )
                     .aspectRatio(1, contentMode: .fit)
                     .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))

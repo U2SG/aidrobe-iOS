@@ -31,6 +31,13 @@ extension Endpoints {
         )
     }
 
+    public static func pendingImportTasks(limit: Int = 20, offset: Int = 0) -> Endpoint<[Wire.ImportTaskResponse]> {
+        Endpoint(.get, "/v1/import-tasks", query: [
+            URLQueryItem(name: "limit", value: String(limit)),
+            URLQueryItem(name: "offset", value: String(offset)),
+        ])
+    }
+
     public static func importTask(_ taskID: String) -> Endpoint<Wire.ImportTaskResponse> {
         Endpoint(.get, "/v1/import-tasks/\(taskID)")
     }

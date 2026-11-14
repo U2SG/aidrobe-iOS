@@ -3,9 +3,8 @@ import Foundation
 import UIKit
 
 /// Photo → wardrobe item pipeline: compress, upload (presign), create an import
-/// task with an idempotency key, poll recognition, then confirm. Task ids that
-/// are recognised but not yet confirmed are persisted, so a restart resumes
-/// them instead of losing the work (the backend has no "list my tasks" API).
+/// task with an idempotency key, poll recognition, then confirm. Unfinished
+/// uploads can resume by ID and recognised imports are listed by the server.
 @MainActor
 @Observable
 final class ImportFlowModel {
@@ -35,9 +34,11 @@ final class ImportFlowModel {
         var color: String
         let imageURL: URL?
         let alreadyConfirmed: Bool
+        let possibleDuplicates: [Wire.ImportDuplicateHint]
     }
 
     private(set) var jobs: [Job] = []
+    private(set) var pendingError: String?
     private let api: APIClient
     private let uploader: PresignedUploader
     private let store: UserDefaults
@@ -64,16 +65,36 @@ final class ImportFlowModel {
 
     // MARK: Start
 
-    func importImages(_ images: [UIImage], source: Endpoints.ImportSourceType) {
+    func importImages(
+        _ images: [UIImage], source: Endpoints.ImportSourceType, input: Endpoints.ImportInputType = .image
+    ) {
         for image in images {
             let job = Job(id: UUID(), thumbnail: image, phase: .uploading)
             jobs.append(job)
-            Task { await run(job.id, image: image, source: source) }
+            Task { await run(job.id, image: image, source: source, input: input) }
         }
     }
 
-    /// Re-attaches tasks that were recognised but not confirmed before a restart.
-    func resumePending() async {
+    func loadPending() async {
+        pendingError = nil
+        do {
+            let pageSize = 20
+            var offset = 0
+            while true {
+                let tasks = try await api.send(Endpoints.pendingImportTasks(limit: pageSize, offset: offset))
+                guard !Task.isCancelled else { return }
+                for task in tasks where !jobs.contains(where: { $0.taskID == task.taskId }) {
+                    jobs.append(Job(id: UUID(), taskID: task.taskId, phase: .needsConfirm(task)))
+                }
+                if tasks.count < pageSize { break }
+                offset += tasks.count
+            }
+        } catch {
+            // Older servers still support continuing this device's uploads by ID.
+            if !Task.isCancelled && (error as? APIError)?.status != 405 {
+                pendingError = userMessage(for: error)
+            }
+        }
         for taskID in pendingTaskIDs where !jobs.contains(where: { $0.taskID == taskID }) {
             let id = UUID()
             jobs.append(Job(id: id, taskID: taskID, phase: .recognising))
@@ -81,7 +102,21 @@ final class ImportFlowModel {
         }
     }
 
-    private func run(_ id: UUID, image: UIImage, source: Endpoints.ImportSourceType) async {
+    func review(_ jobID: UUID, taskID: String) async -> Wire.ImportTaskResponse? {
+        do {
+            let task = try await api.send(Endpoints.importTask(taskID))
+            if task.status == "waiting_confirm" { return task }
+            forget(taskID)
+            jobs.removeAll { $0.id == jobID }
+        } catch {
+            pendingError = userMessage(for: error)
+        }
+        return nil
+    }
+
+    private func run(
+        _ id: UUID, image: UIImage, source: Endpoints.ImportSourceType, input: Endpoints.ImportInputType
+    ) async {
         guard let data = ImageCompressor.jpegData(from: image) else {
             return update(id) { $0.phase = .failed("图片无法读取") }
         }
@@ -92,7 +127,7 @@ final class ImportFlowModel {
             // returns the same task instead of a duplicate.
             let task = try await api.send(Endpoints.createImport(
                 imageURL: upload.fileURL.absoluteString,
-                inputType: .image,
+                inputType: input,
                 source: source,
                 idempotencyKey: id.uuidString
             ))
@@ -135,12 +170,13 @@ final class ImportFlowModel {
         return candidates.map { candidate in
             CandidateDraft(
                 tempItemID: candidate.tempItemId,
-                include: candidate.shouldImport ?? true,
+                include: candidate.possibleDuplicates?.isEmpty != false && (candidate.shouldImport ?? true),
                 title: candidate.displayName ?? candidate.title,
                 category: candidate.category,
                 color: candidate.colorMain,
-                imageURL: URL(string: candidate.cropImageUrl ?? candidate.originalImageUrl),
-                alreadyConfirmed: candidate.confirmedItemId != nil
+                imageURL: URL(string: candidate.cutoutImageUrl ?? candidate.cropImageUrl ?? candidate.originalImageUrl),
+                alreadyConfirmed: candidate.confirmedItemId != nil,
+                possibleDuplicates: candidate.possibleDuplicates ?? []
             )
         }
     }
@@ -149,11 +185,9 @@ final class ImportFlowModel {
     /// confirm-items so a partial selection can be completed later.
     func confirm(_ jobID: UUID, task: Wire.ImportTaskResponse, drafts: [CandidateDraft]) async -> Bool {
         let selected = drafts.filter { $0.include && !$0.alreadyConfirmed }
-        guard !selected.isEmpty else { return false }
         update(jobID) { $0.phase = .confirming }
         do {
-            if (task.candidateItems?.count ?? 0) <= 1 {
-                let draft = selected[0]
+            if selected.count == 1, let draft = selected.first, draft.tempItemID == nil {
                 _ = try await api.send(Endpoints.confirmImport(
                     taskID: task.taskId,
                     Wire.ConfirmImportRequest(title: draft.title, category: draft.category, colorMain: draft.color)
@@ -165,14 +199,17 @@ final class ImportFlowModel {
                         tempItemId: tempID, title: draft.title, category: draft.category, colorMain: draft.color
                     )
                 }
-                // The form lists every candidate, so an unchecked one is a
-                // deliberate "not this": close the task instead of leaving it open.
+                // Unselected candidates are skipped when the review is submitted.
                 _ = try await api.send(Endpoints.confirmImportItems(
                     taskID: task.taskId, Wire.ConfirmItemsRequest(items: items, dismissRemaining: true)
                 ))
             }
             forget(task.taskId)
-            update(jobID) { $0.phase = .done(itemCount: selected.count) }
+            if selected.isEmpty {
+                jobs.removeAll { $0.id == jobID }
+            } else {
+                update(jobID) { $0.phase = .done(itemCount: selected.count) }
+            }
             return true
         } catch {
             update(jobID) { $0.phase = .needsConfirm(task) }
