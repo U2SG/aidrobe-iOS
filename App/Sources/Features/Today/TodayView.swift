@@ -517,7 +517,7 @@ struct OutfitBoard: View {
                 }
                 .buttonStyle(.plain)
             } else if let pictures, let picture = pictures[item.id] {
-                GarmentPicture(render: picture, fit: true)
+                GarmentPicture(render: picture, fit: true, matchProductBackground: item.usesGeneratedCover)
             } else {
                 piece(item)
             }
@@ -530,7 +530,10 @@ struct OutfitBoard: View {
     @ViewBuilder
     private func piece(_ item: BoardItem) -> some View {
         if let url = item.imageURL {
-            GarmentImage(url: url, forceOriginal: item.usesGeneratedCover, fit: true)
+            GarmentImage(
+                url: url, forceOriginal: item.usesGeneratedCover, fit: true,
+                matchProductBackground: item.usesGeneratedCover
+            )
         } else {
             RoundedRectangle(cornerRadius: Radius.tile)
                 .fill(Color.fill)
