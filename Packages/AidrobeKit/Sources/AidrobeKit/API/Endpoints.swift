@@ -75,6 +75,18 @@ public enum Endpoints {
 
     // MARK: Wardrobe
 
+    public static func wardrobeItem(_ itemID: String) -> Endpoint<Wire.WardrobeItemResponse> {
+        Endpoint(.get, "/v1/wardrobe-items/\(itemID)")
+    }
+
+    public static func recognizeItem(_ itemID: String) -> Endpoint<Wire.WardrobeRecognitionResponse> {
+        Endpoint(.post, "/v1/wardrobe-items/\(itemID)/recognize", timeout: Endpoint<Wire.WardrobeRecognitionResponse>.slowTimeout)
+    }
+
+    public static func generateItemProductImage(_ itemID: String) -> Endpoint<Wire.WardrobeItemResponse> {
+        Endpoint(.post, "/v1/wardrobe-items/\(itemID)/product-image", timeout: Endpoint<Wire.WardrobeItemResponse>.slowTimeout)
+    }
+
     public static func updateItem(
         _ itemID: String,
         _ changes: Wire.UpdateWardrobeItemRequest

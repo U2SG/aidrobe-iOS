@@ -6,11 +6,16 @@ import SwiftUI
 struct ItemDetailView: View {
     let itemID: String
     @Environment(AppModel.self) private var app
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
     @State private var showsOriginal = false
     @State private var isEditing = false
     @State private var confirmsDelete = false
     @State private var notice: String?
+    @State private var isRecognizing = false
+    @State private var isRequestingImage = false
+    @State private var recognition: Wire.WardrobeRecognitionResponse?
+    @State private var showsRecognition = false
 
     private var store: WardrobeStore { app.wardrobe }
 
@@ -53,7 +58,7 @@ struct ItemDetailView: View {
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 } else if item.cutoutStatus == "rejected" {
-                    Text("商品图未通过核对，已保留参考图")
+                    Text("商品图未通过核对，已保留原封面")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 } else if item.cutoutStatus == "failed" {
@@ -72,6 +77,22 @@ struct ItemDetailView: View {
                     Text("\(Garment.category(item.category)) · \(Garment.color(item.colorMain))")
                         .font(.subheadline)
                         .foregroundStyle(Color.secondaryLabel)
+                }
+                if item.originalImageUrl != nil {
+                    let actions = dynamicTypeSize.isAccessibilitySize ? AnyLayout(VStackLayout(alignment: .leading))
+                        : AnyLayout(HStackLayout())
+                    actions {
+                        Button(isRecognizing ? "识别中…" : "重新识别", systemImage: "viewfinder") {
+                            recognize(item)
+                        }
+                        .disabled(isRecognizing || isRequestingImage || item.cutoutStatus == "queued")
+                        Button(productImageAction(item), systemImage: "sparkles") {
+                            requestProductImage(item)
+                        }
+                        .disabled(isRecognizing || isRequestingImage || item.cutoutStatus == "queued")
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
                 }
                 VStack(spacing: 0) {
                     Divider().overlay(Color.separator)
@@ -132,6 +153,12 @@ struct ItemDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) { ItemEditSheet(item: item) }
+        .sheet(isPresented: $showsRecognition, onDismiss: { recognition = nil }) {
+            if let recognition { ItemEditSheet(item: item, recognition: recognition) }
+        }
+        .task(id: item.cutoutStatus) {
+            if item.cutoutStatus == "queued" { await store.refreshProductImage(item.itemId) }
+        }
         .confirmationDialog("移除「\(item.displayName)」？", isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button("移除", role: .destructive) {
                 Task {
@@ -145,6 +172,40 @@ struct ItemDetailView: View {
             }
         } message: {
             Text("它的穿着记录也会一起删除，之后不会再出现在搭配里。")
+        }
+    }
+
+    private func recognize(_ item: Wire.WardrobeItemResponse) {
+        isRecognizing = true
+        Task {
+            defer { isRecognizing = false }
+            do {
+                recognition = try await store.recognize(item.itemId)
+                showsRecognition = true
+            } catch {
+                notice = userMessage(for: error)
+            }
+        }
+    }
+
+    private func productImageAction(_ item: Wire.WardrobeItemResponse) -> String {
+        switch item.cutoutStatus {
+        case "queued": "生成中…"
+        case "ready", "failed", "rejected": "重新生成商品图"
+        default: "生成商品图"
+        }
+    }
+
+    private func requestProductImage(_ item: Wire.WardrobeItemResponse) {
+        isRequestingImage = true
+        Task {
+            defer { isRequestingImage = false }
+            do {
+                try await store.requestProductImage(item.itemId)
+                showsOriginal = false
+            } catch {
+                notice = userMessage(for: error)
+            }
         }
     }
 
@@ -185,6 +246,7 @@ struct ItemDetailView: View {
 
 private struct ItemEditSheet: View {
     let item: Wire.WardrobeItemResponse
+    let recognition: Wire.WardrobeRecognitionResponse?
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -195,11 +257,12 @@ private struct ItemEditSheet: View {
     @State private var formality: Int
     @State private var failure: String?
 
-    init(item: Wire.WardrobeItemResponse) {
+    init(item: Wire.WardrobeItemResponse, recognition: Wire.WardrobeRecognitionResponse? = nil) {
         self.item = item
-        _name = State(initialValue: item.displayName)
-        _category = State(initialValue: item.category)
-        _color = State(initialValue: item.colorMain.lowercased())
+        self.recognition = recognition
+        _name = State(initialValue: recognition?.title ?? item.displayName)
+        _category = State(initialValue: recognition?.category ?? item.category)
+        _color = State(initialValue: (recognition?.colorMain ?? item.colorMain).lowercased())
         _material = State(initialValue: item.material?.lowercased() ?? "")
         _seasons = State(initialValue: Set(item.seasonTags ?? []))
         // Snap a recognised score onto the nearest option; 0 = not recorded.
@@ -209,7 +272,7 @@ private struct ItemEditSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("名称") {
+                Section(recognition == nil ? "名称" : "核对识别结果") {
                     TextField("名称", text: $name)
                 }
                 Section {
@@ -247,13 +310,14 @@ private struct ItemEditSheet: View {
                     if let failure {
                         Text(failure).foregroundStyle(Color.danger)
                     } else {
-                        Text("搭配会按季节和场合挑选，你改过的内容不会再被识别结果覆盖。")
+                        Text(recognition == nil ? "搭配会按季节和场合挑选，你改过的内容不会再被识别结果覆盖。"
+                             : "确认名称、分类和颜色后保存。")
                     }
                 }
             }
             .scrollContentBackground(.hidden)
             .background(Color.groupedBackground)
-            .navigationTitle("修改")
+            .navigationTitle(recognition == nil ? "修改" : "重新识别")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {

@@ -168,9 +168,7 @@ final class TodayModel {
     }
 
     func loadGeneratedImage(for outfitID: String) async {
-        guard generatedImages[outfitID] == nil,
-              !rejectedOutfitImages.contains(outfitID),
-              generatingOutfits.insert(outfitID).inserted else { return }
+        guard generatingOutfits.insert(outfitID).inserted else { return }
         defer { generatingOutfits.remove(outfitID) }
         do {
             let asset = try await api.send(Endpoints.generatedOutfitImage(outfitID))
@@ -206,6 +204,7 @@ final class TodayModel {
             case "completed":
                 if let image = asset.imageUrl.flatMap(URL.init(string:)) {
                     generatedImages[outfitID] = image
+                    rejectedOutfitImages.remove(outfitID)
                 } else if reportFailure {
                     notice = "这套搭配图暂时打不开"
                 }
