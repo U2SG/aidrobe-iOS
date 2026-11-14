@@ -63,7 +63,48 @@ final class TodayModel {
 
     var outfits: [Wire.OutfitResponse] { today?.outfits ?? [] }
     var isReady: Bool { today?.status == "ready" && !outfits.isEmpty }
-    var weather: Wire.WeatherContextResponse? { today?.context?.weather }
+    var weather: Wire.WeatherContextResponse? {
+        #if DEBUG
+        if let staged = Self.stagedWeather { return staged }
+        #endif
+        return today?.context?.weather
+    }
+
+    #if DEBUG
+    /// `-aidrobe.debug.weather "小雨,12,22"` (condition, °C, optional hour) stages a
+    /// sky for screenshots when the backend has no weather provider.
+    private static var stagedWeather: Wire.WeatherContextResponse? {
+        guard let parts = UserDefaults.standard.string(forKey: "aidrobe.debug.weather")?.split(separator: ","),
+              let condition = parts.first, parts.count >= 2, let temperature = Double(parts[1]) else { return nil }
+        return Wire.WeatherContextResponse(
+            temperatureC: temperature,
+            feelsLikeC: temperature - 2,
+            rainProbability: condition.contains("雨") ? 0.8 : 0.1,
+            condition: String(condition),
+            locationName: "上海"
+        )
+    }
+
+    static var stagedHour: Int? {
+        let parts = UserDefaults.standard.string(forKey: "aidrobe.debug.weather")?.split(separator: ",") ?? []
+        return parts.count >= 3 ? Int(parts[2]) : nil
+    }
+    #endif
+
+    /// The sky to draw behind the page, when there is weather to draw.
+    var sky: WeatherVisual? {
+        guard let weather else { return nil }
+        var visual = WeatherVisual(weather)
+        #if DEBUG
+        if let hour = Self.stagedHour {
+            visual = WeatherVisual(
+                condition: weather.condition, icon: weather.icon, temperatureC: weather.temperatureC,
+                windSpeed: weather.windSpeed, hour: hour
+            )
+        }
+        #endif
+        return visual
+    }
 
     func load() async {
         if today == nil { phase = .loading }

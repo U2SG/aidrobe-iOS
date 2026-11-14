@@ -143,6 +143,27 @@ final class WalkthroughTests: XCTestCase {
         shot("23-profile-dark")
     }
 
+    /// The sky behind Today for each kind of weather, staged through the debug argument.
+    func testWeatherSkies() {
+        let skies = [
+            ("晴,24,10", "50-sky-clear"), ("多云,18,10", "51-sky-cloudy"), ("阴,14,10", "52-sky-overcast"),
+            ("中雨,12,10", "53-sky-rain"), ("小雪,-1,10", "54-sky-snow"), ("雾,9,8", "55-sky-fog"),
+            ("晴,16,22", "56-sky-clear-night"),
+        ]
+        for (staged, name) in skies {
+            launch(onboarded: true, extra: ["-aidrobe.debug.weather", staged, "-aidrobe.display.appearance", "light"])
+            XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
+            settle(5)
+            shot(name)
+        }
+        for (staged, name) in [("中雨,12,10", "57-sky-rain-dark"), ("晴,24,10", "58-sky-clear-dark"), ("晴,16,22", "59-sky-night-dark")] {
+            launch(onboarded: true, extra: ["-aidrobe.debug.weather", staged, "-aidrobe.display.appearance", "dark"])
+            XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
+            settle(5)
+            shot(name)
+        }
+    }
+
     /// Stores a weather location (dev data). Set one first:
     /// `xcrun simctl location <device> set 31.23,121.47`.
     func testUseCurrentLocation() {

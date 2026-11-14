@@ -34,7 +34,13 @@ struct TodayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.background)
+        .background {
+            if let sky = model?.sky {
+                WeatherBackground(visual: sky)
+            } else {
+                Color.background.ignoresSafeArea()
+            }
+        }
         .toolbar(.hidden, for: .navigationBar)
         .task {
             if model == nil { model = TodayModel(api: app.api, wardrobe: app.wardrobe) }
