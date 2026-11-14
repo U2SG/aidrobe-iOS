@@ -163,7 +163,7 @@ private struct PendingImportRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.control) {
-            GarmentImage(url: task.candidateItem.flatMap { URL(string: $0.originalImageUrl) }, forceOriginal: true)
+            GarmentImage(url: task.candidateItem.flatMap { URL(string: $0.originalImageUrl) }, forceOriginal: true, fit: true)
                 .frame(width: 48, height: 48)
             VStack(alignment: .leading, spacing: 4) {
                 let names = candidates.prefix(2).map { $0.displayName ?? $0.title }
@@ -271,7 +271,7 @@ private struct ConfirmImportView: View {
                         )
                     }
                     if draft.possibleDuplicates.isEmpty {
-                        GarmentImage(url: draft.imageURL, forceOriginal: true)
+                        GarmentImage(url: draft.imageURL, forceOriginal: true, fit: true)
                             .frame(height: 180)
                     } else {
                         ForEach(draft.possibleDuplicates, id: \.itemId) { match in
@@ -354,7 +354,7 @@ private struct ConfirmImportView: View {
 
     private func comparison(_ title: String, url: URL?) -> some View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
-            GarmentImage(url: url, forceOriginal: true)
+            GarmentImage(url: url, forceOriginal: true, fit: true)
                 .frame(height: 115)
             Text(title)
                 .font(.caption)

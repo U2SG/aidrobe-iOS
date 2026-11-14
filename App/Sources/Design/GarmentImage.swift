@@ -94,17 +94,30 @@ struct GarmentImage: View {
     let url: URL?
     var forceOriginal = false
     var fit = false
+    var photoAspectRatio: CGFloat?
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @State private var render: GarmentRender?
 
     var body: some View {
-        GarmentPicture(render: render, fit: fit)
+        picture
             .task(id: TaskKey(url: url, cutout: prefersCutout && !forceOriginal)) {
                 guard let url else { return render = nil }
                 render = await GarmentImagePipeline.shared.render(url, cutout: prefersCutout && !forceOriginal)
             }
             .animation(.easeOut(duration: 0.2), value: render?.isCutout)
             .accessibilityHidden(true)
+    }
+
+    @ViewBuilder
+    private var picture: some View {
+        let image = GarmentPicture(render: render, fit: fit)
+        if let fallback = photoAspectRatio {
+            let size = render?.image.size
+            let ratio = size.flatMap { $0.height > 0 ? $0.width / $0.height : nil } ?? fallback
+            image.aspectRatio(ratio, contentMode: .fit)
+        } else {
+            image
+        }
     }
 
     private struct TaskKey: Equatable {

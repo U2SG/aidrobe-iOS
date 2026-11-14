@@ -7,7 +7,6 @@ struct ItemDetailView: View {
     let itemID: String
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
-    @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @State private var showsOriginal = false
     @State private var isEditing = false
     @State private var confirmsDelete = false
@@ -33,14 +32,14 @@ struct ItemDetailView: View {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 GarmentImage(
                     url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
-                    forceOriginal: showsOriginal || item.cutoutStatus == "ready" || item.cutoutStatus == "queued",
-                    fit: showsOriginal || item.cutoutStatus == "ready"
+                    forceOriginal: true,
+                    fit: true
                 )
                     .aspectRatio(1, contentMode: .fit)
                     .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
                     .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
                     .overlay(alignment: .bottomTrailing) {
-                        if prefersCutout || item.coverImageUrl != item.originalImageUrl {
+                        if let original = item.originalImageUrl, let cover = item.coverImageUrl, original != cover {
                             Button(showsOriginal ? (item.cutoutStatus == "ready" ? "看商品图" : "看封面") : "看原图") {
                                 showsOriginal.toggle()
                             }

@@ -266,8 +266,7 @@ private struct TodayPage: View {
                 swapTarget = SwapTarget(outfit: outfit, slot: slot)
             }
         } else if let image = model.generatedImages[outfit.outfitId] {
-            GarmentImage(url: image, forceOriginal: true, fit: true)
-                .aspectRatio(0.86, contentMode: .fit)
+            GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                 .accessibilityHidden(false)
                 .accessibilityLabel("AI 生成的整套搭配图")
         } else {
