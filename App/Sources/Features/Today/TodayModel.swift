@@ -71,39 +71,36 @@ final class TodayModel {
     }
 
     #if DEBUG
-    /// `-aidrobe.debug.weather "小雨,12,22"` (condition, °C, optional hour) stages a
-    /// sky for screenshots when the backend has no weather provider.
+    /// `-aidrobe.debug.weather "小雨,12,8.5,30,80,东北风"` — condition, °C, then optionally
+    /// hour, wind km/h, humidity % and wind direction — stages a sky for screenshots
+    /// when the backend has no weather provider.
+    private static var staged: [Substring] {
+        UserDefaults.standard.string(forKey: "aidrobe.debug.weather")?.split(separator: ",", omittingEmptySubsequences: false) ?? []
+    }
+
     private static var stagedWeather: Wire.WeatherContextResponse? {
-        guard let parts = UserDefaults.standard.string(forKey: "aidrobe.debug.weather")?.split(separator: ","),
-              let condition = parts.first, parts.count >= 2, let temperature = Double(parts[1]) else { return nil }
+        let parts = staged
+        guard parts.count >= 2, let temperature = Double(parts[1]) else { return nil }
         return Wire.WeatherContextResponse(
             temperatureC: temperature,
             feelsLikeC: temperature - 2,
-            rainProbability: condition.contains("雨") ? 0.8 : 0.1,
-            condition: String(condition),
+            rainProbability: parts[0].contains("雨") ? 0.8 : 0.1,
+            condition: String(parts[0]),
+            humidity: parts.count > 4 ? Int(parts[4]) : nil,
+            windDir: parts.count > 5 ? String(parts[5]) : nil,
+            windSpeed: parts.count > 3 ? Double(parts[3]) : nil,
             locationName: "上海"
         )
     }
-
-    static var stagedHour: Int? {
-        let parts = UserDefaults.standard.string(forKey: "aidrobe.debug.weather")?.split(separator: ",") ?? []
-        return parts.count >= 3 ? Int(parts[2]) : nil
-    }
     #endif
 
-    /// The sky to draw behind the page, when there is weather to draw.
+    /// The light to lay over the page, when there is weather to show.
     var sky: WeatherVisual? {
         guard let weather else { return nil }
-        var visual = WeatherVisual(weather)
         #if DEBUG
-        if let hour = Self.stagedHour {
-            visual = WeatherVisual(
-                condition: weather.condition, icon: weather.icon, temperatureC: weather.temperatureC,
-                windSpeed: weather.windSpeed, hour: hour
-            )
-        }
+        if Self.staged.count > 2, let hour = Double(Self.staged[2]) { return WeatherVisual(weather, hour: hour) }
         #endif
-        return visual
+        return WeatherVisual(weather)
     }
 
     func load() async {

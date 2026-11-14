@@ -20,6 +20,8 @@ jobs:
       - name: AidrobeKit unit tests
         working-directory: Packages/AidrobeKit
         run: swift test
+      - name: Metal toolchain (the weather light is a shader)
+        run: xcodebuild -downloadComponent MetalToolchain
       - name: Build app (simulator, unsigned)
         run: |
           # Keep the log short, but always show compiler errors: the tail alone

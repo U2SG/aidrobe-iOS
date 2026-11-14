@@ -143,25 +143,33 @@ final class WalkthroughTests: XCTestCase {
         shot("23-profile-dark")
     }
 
-    /// The sky behind Today for each kind of weather, staged through the debug argument.
+    /// The light on Today across the weather space, staged through the debug argument
+    /// (condition, °C, hour, wind km/h, humidity %, wind direction). Pairs show the
+    /// same weather under different numbers.
     func testWeatherSkies() {
-        let skies = [
-            ("晴,24,10", "50-sky-clear"), ("多云,18,10", "51-sky-cloudy"), ("阴,14,10", "52-sky-overcast"),
-            ("中雨,12,10", "53-sky-rain"), ("小雪,-1,10", "54-sky-snow"), ("雾,9,8", "55-sky-fog"),
-            ("晴,16,22", "56-sky-clear-night"),
+        let light: [(String, String)] = [
+            ("晴,24,10,6,40", "50-clear-morning"), ("晴,27,13,6,40", "51-clear-noon"), ("晴,22,17,10,45", "52-clear-evening"),
+            ("多云,18,10,8,55", "53-cloudy-calm"), ("多云,18,15,38,55,西风", "54-cloudy-windy"),
+            ("阴,14,10,10,70", "55-overcast"),
+            ("小雨,13,10,8,90", "56-rain-light"), ("暴雨,12,10,40,95,东风", "57-rain-heavy-wind"), ("雷阵雨,20,15,25,90", "58-thunder"),
+            ("小雪,-1,10,6,80", "59-snow-light"), ("大雪,-4,10,35,85,西风", "60-snow-heavy-wind"),
+            ("雾,9,8,3,95", "61-fog"), ("霾,11,10,5,60", "62-haze"), ("沙尘暴,16,14,50,20,西北风", "63-sandstorm"),
+            ("大风,15,11,60,35", "64-gale-clear"), ("晴,16,22,6,50", "65-night"),
         ]
-        for (staged, name) in skies {
-            launch(onboarded: true, extra: ["-aidrobe.debug.weather", staged, "-aidrobe.display.appearance", "light"])
-            XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
-            settle(5)
-            shot(name)
-        }
-        for (staged, name) in [("中雨,12,10", "57-sky-rain-dark"), ("晴,24,10", "58-sky-clear-dark"), ("晴,16,22", "59-sky-night-dark")] {
-            launch(onboarded: true, extra: ["-aidrobe.debug.weather", staged, "-aidrobe.display.appearance", "dark"])
-            XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
-            settle(5)
-            shot(name)
-        }
+        for (staged, name) in light { stage(staged, name, appearance: "light") }
+        let dark: [(String, String)] = [
+            ("晴,24,10,6,40", "70-dark-clear"), ("多云,18,15,38,55,西风", "71-dark-cloudy-windy"), ("阴,14,10,10,70", "72-dark-overcast"),
+            ("暴雨,12,10,40,95,东风", "73-dark-rain-heavy"), ("大雪,-4,10,35,85,西风", "74-dark-snow"),
+            ("沙尘暴,16,14,50,20,西北风", "75-dark-sandstorm"), ("晴,16,22,6,50", "76-dark-night"),
+        ]
+        for (staged, name) in dark { stage(staged, name, appearance: "dark") }
+    }
+
+    private func stage(_ weather: String, _ name: String, appearance: String) {
+        launch(onboarded: true, extra: ["-aidrobe.debug.weather", weather, "-aidrobe.display.appearance", appearance])
+        XCTAssert(app.tabBars.buttons["我的"].waitForExistence(timeout: 60))
+        settle(4)
+        shot(name)
     }
 
     /// Stores a weather location (dev data). Set one first:

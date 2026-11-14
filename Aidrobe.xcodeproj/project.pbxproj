@@ -43,6 +43,7 @@
 		E09CD2767B9753C64768040D /* OutfitRecordView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */; };
 		E7A3D7C5895AC33347E0B4D2 /* InsightsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 24A775BD53C5838DA407C7DD /* InsightsView.swift */; };
 		E9896DB0D562D55FB5F5E9A4 /* AskView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F038BBD453873CAB8D0919C6 /* AskView.swift */; };
+		EAEB02680F20C50D3BC12EFC /* WeatherLight.metal in Sources */ = {isa = PBXBuildFile; fileRef = 3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */; };
 		F5FF25B794BEC745F9EAD1AE /* SubjectLiftLab.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */; };
 		F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA534CB73E3108CA3F87E4E9 /* WardrobeStore.swift */; };
 		FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */ = {isa = PBXBuildFile; fileRef = 90100721EC7C17A012A33113 /* Components.swift */; };
@@ -68,6 +69,7 @@
 		2D99093DC0B7E362A768CD42 /* MemoryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MemoryView.swift; sourceTree = "<group>"; };
 		3180A8492D7D9ED80704364A /* AidrobeUITests.xctest */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.cfbundle; path = AidrobeUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		329CBC1021F57A493A97BCC3 /* JournalModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = JournalModel.swift; sourceTree = "<group>"; };
+		3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.metal; path = WeatherLight.metal; sourceTree = "<group>"; };
 		4978DA71F7ED06AD2E2DB5E5 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Release.xcconfig; sourceTree = "<group>"; };
 		4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProfileModel.swift; sourceTree = "<group>"; };
 		51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PrivacyView.swift; sourceTree = "<group>"; };
@@ -170,6 +172,7 @@
 				88F0A220DA8F46419E1AB257 /* GarmentImage.swift */,
 				6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */,
 				8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */,
+				3A6D5FF09EB7BCB14C4466FC /* WeatherLight.metal */,
 				AAD449569DE71B249DA951F5 /* WeatherLight.swift */,
 			);
 			path = Design;
@@ -473,6 +476,7 @@
 				8130158784309756D1586D33 /* Vocabulary.swift in Sources */,
 				F7E15ED5F38BF3121ECD9576 /* WardrobeStore.swift in Sources */,
 				80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */,
+				EAEB02680F20C50D3BC12EFC /* WeatherLight.metal in Sources */,
 				23A762FCBBCBB73B0697C9CA /* WeatherLight.swift in Sources */,
 				AE6C6A966ADAD5EF416DA11C /* WelcomeView.swift in Sources */,
 			);
