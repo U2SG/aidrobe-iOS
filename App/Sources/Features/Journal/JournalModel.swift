@@ -72,7 +72,6 @@ final class JournalModel {
     private(set) var total = 0
     private(set) var isLoadingMore = false
     private(set) var markedDays: [JournalMonth: Set<String>] = [:]
-    private(set) var outfits: [String: Wire.OutfitResponse] = [:]
     private(set) var feedbackLabels: [String: String] = [:]
     var month = JournalMonth.current
     var notice: String?
@@ -80,7 +79,6 @@ final class JournalModel {
     private let api: APIClient
     private let wardrobe: WardrobeStore
     private var page = 0
-    private var requestedOutfits: Set<String> = []
     private static let pageSize = 30
 
     init(api: APIClient, wardrobe: WardrobeStore) {
@@ -145,29 +143,18 @@ final class JournalModel {
 
     // MARK: Pieces
 
-    /// History entries don't list their pieces; fetch the outfit once per id.
-    func loadOutfit(for entry: Wire.OutfitHistoryEntry) async {
-        guard let id = entry.outfit?.outfitId, requestedOutfits.insert(id).inserted else { return }
-        if let outfit = try? await api.send(Endpoints.outfit(id)) {
-            outfits[id] = outfit
-        } else {
-            requestedOutfits.remove(id)
-        }
-    }
-
-    /// Nil while the pieces are still loading (or could not be loaded).
-    func boardItems(for entry: Wire.OutfitHistoryEntry) -> [BoardItem]? {
-        guard let id = entry.outfit?.outfitId, let outfit = outfits[id] else { return nil }
+    /// The pieces worn that day, straight from the history entry.
+    func boardItems(for entry: Wire.OutfitHistoryEntry) -> [BoardItem] {
         let order = ["outerwear", "top", "dress", "bottom", "shoes"]
-        return outfit.items.map { slot -> BoardItem in
+        return (entry.outfit?.items ?? []).map { slot -> BoardItem in
             let item = wardrobe.item(slot.itemId)
             return BoardItem(
                 slotID: slot.itemId,
                 itemID: slot.itemId,
                 role: item?.category ?? slot.category ?? "accessory",
-                // A piece removed from the wardrobe since then keeps its place in the record.
+                // A piece removed from the wardrobe since then keeps its place and picture in the record.
                 name: item?.displayName ?? slot.title ?? "已不在衣橱里的单品",
-                imageURL: item.flatMap(WardrobeStore.imageURL)
+                imageURL: item.flatMap(WardrobeStore.imageURL) ?? slot.coverImageUrl.flatMap(URL.init(string:))
             )
         }
         .sorted { (order.firstIndex(of: $0.role) ?? order.count) < (order.firstIndex(of: $1.role) ?? order.count) }

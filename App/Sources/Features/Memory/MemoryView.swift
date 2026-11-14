@@ -148,28 +148,10 @@ struct MemoryView: View {
     }
 }
 
-/// Turns a stored preference (`type` + `label` token) into a sentence.
 enum MemoryCopy {
-    private static let sentences = [
-        "too_formal": "太正式的搭配，你不太喜欢",
-        "too_casual": "太随意的搭配，你不太喜欢",
-        "too_warm": "你容易觉得热，会少加一层",
-        "too_cold": "你容易觉得冷，会多加一层",
-        "not_my_style": "这类风格不是你的",
-        "wrong_fit": "这种版型你穿着不合适",
-        "wrong_color": "这个颜色你不喜欢",
-        "itchy": "扎人的面料你不想穿",
-    ]
-
-    private static let types = [
-        "style": "风格", "color": "颜色", "fit": "版型", "occasion": "场合", "brand": "品牌", "material": "材质",
-        "formality": "正式度", "climate": "冷暖", "footwear": "鞋款", "negative_preference": "不想要的",
-    ]
-
+    /// The backend writes each preference as a sentence.
     static func sentence(for item: Wire.MemoryItemResponse) -> String {
-        if let known = sentences[item.label] { return known }
-        let label = Garment.swatch(item.label) != nil ? Garment.color(item.label) : item.label.replacing("_", with: " ")
-        return "\(types[item._type] ?? item._type)：\(label)"
+        item.displayText
     }
 
     /// "来自你的反馈 · 初步 · 11月13日"

@@ -203,7 +203,8 @@ private struct JournalRow: View {
                             .foregroundStyle(Color.tertiaryLabel)
                     }
                 }
-                if let items = model.boardItems(for: entry), !items.isEmpty {
+                let items = model.boardItems(for: entry)
+                if !items.isEmpty {
                     HStack(spacing: Spacing.tight) {
                         ForEach(items.prefix(5)) { item in
                             GarmentImage(url: item.imageURL)
@@ -218,7 +219,6 @@ private struct JournalRow: View {
         }
         .padding(.vertical, Spacing.row)
         .contentShape(.rect)
-        .task { await model.loadOutfit(for: entry) }
         .accessibilityElement(children: .combine)
     }
 

@@ -20,13 +20,10 @@ struct OutfitRecordView: View {
                             .foregroundStyle(Color.secondaryLabel)
                     }
                 }
-                if let items = model.boardItems(for: entry) {
-                    if !items.isEmpty {
-                        OutfitBoard(items: items)
-                        pieces(items)
-                    }
-                } else if entry.outfit != nil {
-                    ProgressView().frame(maxWidth: .infinity, minHeight: 160)
+                let items = model.boardItems(for: entry)
+                if !items.isEmpty {
+                    OutfitBoard(items: items)
+                    pieces(items)
                 }
                 if let photo = entry.ootdImageUrl.flatMap(URL.init(string:)) {
                     VStack(alignment: .leading, spacing: Spacing.control) {
@@ -46,7 +43,6 @@ struct OutfitRecordView: View {
         }
         .background(Color.background)
         .navigationBarTitleDisplayMode(.inline)
-        .task { await model.loadOutfit(for: entry) }
     }
 
     private var dateLine: String {

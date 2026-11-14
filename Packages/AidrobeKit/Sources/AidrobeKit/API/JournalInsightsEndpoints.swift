@@ -19,12 +19,6 @@ extension Endpoints {
         Endpoint(.get, "/v1/outfit-history/\(wornDate)")
     }
 
-    /// A recommended outfit with its pieces. History entries carry an empty
-    /// `items` list, so the journal reads the pieces from here.
-    public static func outfit(_ outfitID: String) -> Endpoint<Wire.OutfitResponse> {
-        Endpoint(.get, "/v1/recommendations/outfits/\(outfitID)")
-    }
-
     // MARK: Insights
 
     public static func insightsSummary() -> Endpoint<Wire.InsightsSummaryResponse> {
