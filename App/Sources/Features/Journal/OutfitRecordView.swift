@@ -5,6 +5,7 @@ import SwiftUI
 struct OutfitRecordView: View {
     let entry: Wire.OutfitHistoryEntry
     let model: JournalModel
+    @State private var shareDraft: OutfitShareDraft?
 
     var body: some View {
         ScrollView {
@@ -43,6 +44,19 @@ struct OutfitRecordView: View {
         }
         .background(Color.background)
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            let items = model.boardItems(for: entry)
+            if !items.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("分享这套", systemImage: "square.and.arrow.up") {
+                        shareDraft = OutfitShareDraft(items: items, date: Garment.day(entry.wornDate))
+                    }
+                }
+            }
+        }
+        .sheet(item: $shareDraft) { draft in
+            OutfitShareSheet(draft: draft)
+        }
     }
 
     private var dateLine: String {

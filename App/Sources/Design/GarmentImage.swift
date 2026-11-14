@@ -97,6 +97,26 @@ struct GarmentImage: View {
     @State private var render: GarmentRender?
 
     var body: some View {
+        GarmentPicture(render: render)
+            .task(id: TaskKey(url: url, cutout: prefersCutout && !forceOriginal)) {
+                guard let url else { return render = nil }
+                render = await GarmentImagePipeline.shared.render(url, cutout: prefersCutout && !forceOriginal)
+            }
+            .animation(.easeOut(duration: 0.2), value: render?.isCutout)
+            .accessibilityHidden(true)
+    }
+
+    private struct TaskKey: Equatable {
+        let url: URL?
+        let cutout: Bool
+    }
+}
+
+/// The same tile treatment for live pictures and snapshots rendered for sharing.
+struct GarmentPicture: View {
+    let render: GarmentRender?
+
+    var body: some View {
         Color.clear
             .overlay {
                 if let render {
@@ -114,17 +134,7 @@ struct GarmentImage: View {
             }
             .background((render?.isCutout ?? false) ? Color.clear : Color.fill)
             .clipShape(.rect(cornerRadius: Radius.tile))
-            .task(id: TaskKey(url: url, cutout: prefersCutout && !forceOriginal)) {
-                guard let url else { return render = nil }
-                render = await GarmentImagePipeline.shared.render(url, cutout: prefersCutout && !forceOriginal)
-            }
-            .animation(.easeOut(duration: 0.2), value: render?.isCutout)
             .accessibilityHidden(true)
-    }
-
-    private struct TaskKey: Equatable {
-        let url: URL?
-        let cutout: Bool
     }
 }
 
