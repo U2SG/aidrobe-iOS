@@ -39,6 +39,7 @@ final class ImportFlowModel {
         var category: String
         var color: String
         let imageURL: URL?
+        let imageCaption: String
         let alreadyConfirmed: Bool
         let possibleDuplicates: [Wire.ImportDuplicateHint]
     }
@@ -195,6 +196,8 @@ final class ImportFlowModel {
                 category: candidate.category,
                 color: candidate.colorMain,
                 imageURL: URL(string: candidate.cutoutImageUrl ?? candidate.cropImageUrl ?? candidate.originalImageUrl),
+                imageCaption: candidate.cutoutImageUrl != nil ? "商品图"
+                    : candidate.cropImageUrl != nil ? "原照裁剪" : "原照 · 暂无单品图",
                 alreadyConfirmed: candidate.confirmedItemId != nil,
                 possibleDuplicates: candidate.possibleDuplicates ?? []
             )

@@ -167,8 +167,8 @@ private struct WardrobeTile: View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
             GarmentImage(
                 url: WardrobeStore.imageURL(item),
-                forceOriginal: item.cutoutStatus == "ready" || item.cutoutStatus == "queued",
-                fit: item.cutoutStatus == "ready"
+                forceOriginal: true,
+                fit: true
             )
                 .aspectRatio(0.8, contentMode: .fit)
                 .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.tile))
