@@ -93,11 +93,12 @@ actor GarmentImagePipeline {
 struct GarmentImage: View {
     let url: URL?
     var forceOriginal = false
+    var fit = false
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @State private var render: GarmentRender?
 
     var body: some View {
-        GarmentPicture(render: render)
+        GarmentPicture(render: render, fit: fit)
             .task(id: TaskKey(url: url, cutout: prefersCutout && !forceOriginal)) {
                 guard let url else { return render = nil }
                 render = await GarmentImagePipeline.shared.render(url, cutout: prefersCutout && !forceOriginal)
@@ -115,6 +116,7 @@ struct GarmentImage: View {
 /// The same tile treatment for live pictures and snapshots rendered for sharing.
 struct GarmentPicture: View {
     let render: GarmentRender?
+    var fit = false
 
     var body: some View {
         Color.clear
@@ -128,7 +130,7 @@ struct GarmentPicture: View {
                     } else {
                         Image(uiImage: render.image)
                             .resizable()
-                            .scaledToFill()
+                            .aspectRatio(contentMode: fit ? .fit : .fill)
                     }
                 }
             }

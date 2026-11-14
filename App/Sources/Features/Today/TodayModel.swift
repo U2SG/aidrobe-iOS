@@ -9,6 +9,7 @@ struct BoardItem: Identifiable, Equatable {
     let role: String
     let name: String
     let imageURL: URL?
+    var usesGeneratedCover: Bool = false
 
     var id: String { slotID }
     var isSwapped: Bool { slotID != itemID }
@@ -48,6 +49,8 @@ final class TodayModel {
     private(set) var feedbackTags: [Wire.FeedbackTagResponse] = []
     private(set) var appliedChip: ContextChip?
     private(set) var isRefreshing = false
+    private(set) var generatedImages: [String: URL] = [:]
+    private(set) var generatingOutfits: Set<String> = []
     /// outfit id → recommended item id → the item the user chose instead.
     private var swaps: [String: [String: String]] = [:]
     var notice: String?
@@ -144,19 +147,78 @@ final class TodayModel {
 
     func boardItems(for outfit: Wire.OutfitResponse) -> [BoardItem] {
         let order = ["outerwear", "top", "dress", "bottom", "shoes"]
+        let items = outfit.items.compactMap { slot in
+            wardrobe.item(swaps[outfit.outfitId]?[slot.itemId] ?? slot.itemId)
+        }
+        let sourceCounts = Dictionary(grouping: items.compactMap(\.originalImageUrl), by: { $0 }).mapValues(\.count)
         return outfit.items.map { slot -> BoardItem in
             let itemID = swaps[outfit.outfitId]?[slot.itemId] ?? slot.itemId
             let item = wardrobe.item(itemID)
+            let sharedSource = item?.originalImageUrl.map { sourceCounts[$0, default: 0] > 1 } ?? false
+            let repeatedOriginal = sharedSource && (item?.coverImageUrl == nil || item?.coverImageUrl == item?.originalImageUrl)
             return BoardItem(
                 slotID: slot.itemId,
                 itemID: itemID,
                 role: item?.category ?? slot.category ?? "accessory",
                 name: item?.displayName ?? slot.title ?? "单品",
-                imageURL: item.flatMap(WardrobeStore.imageURL)
+                imageURL: repeatedOriginal ? nil : item.flatMap(WardrobeStore.imageURL),
+                usesGeneratedCover: item?.cutoutStatus == "ready"
             )
         }
         // Dressing order, so the board and the list read top to toe.
         .sorted { (order.firstIndex(of: $0.role) ?? order.count) < (order.firstIndex(of: $1.role) ?? order.count) }
+    }
+
+    func loadGeneratedImage(for outfitID: String) async {
+        guard generatedImages[outfitID] == nil, generatingOutfits.insert(outfitID).inserted else { return }
+        defer { generatingOutfits.remove(outfitID) }
+        do {
+            let asset = try await api.send(Endpoints.generatedOutfitImage(outfitID))
+            try await displayImage(asset, for: outfitID, reportFailure: false)
+        } catch {
+            // This lookup is optional. A first-time outfit has no generated asset.
+        }
+    }
+
+    func generateImage(for outfit: Wire.OutfitResponse) async {
+        let id = outfit.outfitId
+        guard generatingOutfits.insert(id).inserted else { return }
+        defer { generatingOutfits.remove(id) }
+        do {
+            let asset = try await api.send(Endpoints.generateOutfitImage(id))
+            try await displayImage(asset, for: id, reportFailure: true)
+        } catch {
+            if Task.isCancelled { return }
+            notice = (error as? APIError)?.isFeatureDisabled == true
+                ? "当前服务还没有开启搭配生图"
+                : userMessage(for: error)
+        }
+    }
+
+    private func displayImage(
+        _ firstAsset: Wire.OutfitVisualAssetResponse, for outfitID: String, reportFailure: Bool
+    ) async throws {
+        var asset = firstAsset
+        let clock = ContinuousClock()
+        let deadline = clock.now.advanced(by: .seconds(230))
+        while clock.now < deadline {
+            switch asset.generationStatus {
+            case "completed":
+                if let image = asset.imageUrl.flatMap(URL.init(string:)) {
+                    generatedImages[outfitID] = image
+                } else if reportFailure {
+                    notice = "这套搭配图暂时打不开"
+                }
+                return
+            case "failed":
+                if reportFailure { notice = "这次没能生成搭配图" }
+                return
+            default:
+                try await clock.sleep(for: .seconds(3))
+                asset = try await api.send(Endpoints.outfitVisual(asset.assetId))
+            }
+        }
+        if reportFailure { notice = "搭配图还在生成，稍后可以再打开" }
     }
 
     func replacements(for slot: BoardItem, in outfit: Wire.OutfitResponse) async throws -> [Wire.ReplacementCandidateResponse] {
