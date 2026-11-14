@@ -34,12 +34,9 @@ struct TodayView: View {
             }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background {
-            if let sky = model?.sky {
-                WeatherBackground(visual: sky)
-            } else {
-                Color.background.ignoresSafeArea()
-            }
+        .background(Color.background)
+        .overlay {
+            if let sky = model?.sky { WeatherLight(visual: sky) }
         }
         .toolbar(.hidden, for: .navigationBar)
         .task {
