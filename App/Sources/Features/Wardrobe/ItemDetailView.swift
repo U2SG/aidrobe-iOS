@@ -31,12 +31,16 @@ struct ItemDetailView: View {
     private func page(_ item: Wire.WardrobeItemResponse) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
-                GarmentImage(url: WardrobeStore.imageURL(item), forceOriginal: showsOriginal)
+                // The cover may be a server-made cutout; "original" is always the user's own photo.
+                GarmentImage(
+                    url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
+                    forceOriginal: showsOriginal
+                )
                     .aspectRatio(1, contentMode: .fit)
                     .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
                     .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
                     .overlay(alignment: .bottomTrailing) {
-                        if prefersCutout {
+                        if prefersCutout || item.coverImageUrl != item.originalImageUrl {
                             Button(showsOriginal ? "看抠图" : "看原图") { showsOriginal.toggle() }
                                 .font(.footnote)
                                 .buttonStyle(.glass)

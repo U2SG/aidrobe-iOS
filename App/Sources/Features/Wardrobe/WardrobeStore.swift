@@ -33,6 +33,10 @@ final class WardrobeStore {
         (item.coverImageUrl ?? item.originalImageUrl).flatMap(URL.init(string:))
     }
 
+    static func originalURL(_ item: Wire.WardrobeItemResponse) -> URL? {
+        (item.originalImageUrl ?? item.coverImageUrl).flatMap(URL.init(string:))
+    }
+
     func load() async {
         if items.isEmpty { phase = .loading }
         do {
