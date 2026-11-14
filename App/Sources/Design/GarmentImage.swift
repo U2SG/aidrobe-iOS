@@ -95,6 +95,7 @@ struct GarmentImage: View {
     var forceOriginal = false
     var fit = false
     var photoAspectRatio: CGFloat?
+    var matchProductBackground = false
     @AppStorage(Preferences.cutoutKey) private var prefersCutout = true
     @State private var render: GarmentRender?
 
@@ -110,7 +111,7 @@ struct GarmentImage: View {
 
     @ViewBuilder
     private var picture: some View {
-        let image = GarmentPicture(render: render, fit: fit)
+        let image = GarmentPicture(render: render, fit: fit, matchProductBackground: matchProductBackground)
         if let fallback = photoAspectRatio {
             let size = render?.image.size
             let ratio = size.flatMap { $0.height > 0 ? $0.width / $0.height : nil } ?? fallback
@@ -130,6 +131,30 @@ struct GarmentImage: View {
 struct GarmentPicture: View {
     let render: GarmentRender?
     var fit = false
+    var matchProductBackground = false
+
+    private var background: Color {
+        guard let render else { return Color.fill }
+        if render.isCutout { return Color.clear }
+        if matchProductBackground, let image = render.image.cgImage {
+            return Self.productBackground(from: image)
+        }
+        return Color.fill
+    }
+
+    private static func productBackground(from image: CGImage) -> Color {
+        let size = min(image.width, image.height, 8)
+        guard let corner = image.cropping(to: CGRect(x: 0, y: 0, width: size, height: size)),
+              let context = CGContext(
+                data: nil, width: 1, height: 1, bitsPerComponent: 8, bytesPerRow: 4,
+                space: CGColorSpace(name: CGColorSpace.sRGB) ?? CGColorSpaceCreateDeviceRGB(),
+                bitmapInfo: CGImageAlphaInfo.premultipliedLast.rawValue
+              ),
+              let pixel = context.data?.assumingMemoryBound(to: UInt8.self) else { return .white }
+        context.draw(corner, in: CGRect(x: 0, y: 0, width: 1, height: 1))
+        guard pixel[0] > 225, pixel[1] > 225, pixel[2] > 225 else { return .white }
+        return Color(red: Double(pixel[0]) / 255, green: Double(pixel[1]) / 255, blue: Double(pixel[2]) / 255)
+    }
 
     var body: some View {
         Color.clear
@@ -147,7 +172,7 @@ struct GarmentPicture: View {
                     }
                 }
             }
-            .background((render?.isCutout ?? false) ? Color.clear : Color.fill)
+            .background(background)
             .clipShape(.rect(cornerRadius: Radius.tile))
             .accessibilityHidden(true)
     }

@@ -168,11 +168,11 @@ private struct WardrobeTile: View {
             GarmentImage(
                 url: WardrobeStore.imageURL(item),
                 forceOriginal: true,
-                fit: true
+                fit: true,
+                matchProductBackground: item.cutoutStatus == "ready"
             )
                 .aspectRatio(0.8, contentMode: .fit)
                 .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.tile))
-                .overlay(RoundedRectangle(cornerRadius: Radius.tile).strokeBorder(Color.separator))
                 .opacity(item.status == .wearable ? 1 : 0.55)
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.displayName)

@@ -33,11 +33,11 @@ struct ItemDetailView: View {
                 GarmentImage(
                     url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
                     forceOriginal: true,
-                    fit: true
+                    fit: true,
+                    matchProductBackground: !showsOriginal && item.cutoutStatus == "ready"
                 )
                     .aspectRatio(1, contentMode: .fit)
                     .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
-                    .overlay(RoundedRectangle(cornerRadius: Radius.card).strokeBorder(Color.separator))
                     .overlay(alignment: .bottomTrailing) {
                         if let original = item.originalImageUrl, let cover = item.coverImageUrl, original != cover {
                             Button(showsOriginal ? (item.cutoutStatus == "ready" ? "看商品图" : "看封面") : "看原图") {
