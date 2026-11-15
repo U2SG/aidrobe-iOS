@@ -6886,6 +6886,26 @@
      },
      "styling": {
       "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
+     },
+     "item_refs": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Item Refs"
+     },
+     "item_ref_snapshots": {
+      "items": {
+       "$ref": "#/components/schemas/AskItemRefSnapshot"
+      },
+      "type": "array",
+      "title": "Item Ref Snapshots"
+     },
+     "trip_intent": {
+      "$ref": "#/components/schemas/AskTripIntent"
      }
     },
     "type": "object",
@@ -6911,6 +6931,9 @@
      "styling": {
       "$ref": "#/components/schemas/StylingResponse"
      },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
+     },
      "messages": {
       "items": {
        "$ref": "#/components/schemas/AskConversationMessage"
@@ -6934,6 +6957,9 @@
      },
      "styling": {
       "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
      },
      "conversation_id": {
       "type": "string",
@@ -7078,6 +7104,9 @@
      },
      "styling": {
       "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
      },
      "conversation_id": {
       "type": "string",
@@ -8408,6 +8437,29 @@
      "deleted"
     ],
     "title": "DeleteWardrobeItemResponse"
+   },
+   "DesignBrief": {
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "constraints": {
+      "$ref": "#/components/schemas/StylingConstraints"
+     },
+     "needs_outfit_update": {
+      "type": "boolean",
+      "title": "Needs Outfit Update"
+     }
+    },
+    "type": "object",
+    "required": [
+     "revision",
+     "constraints",
+     "needs_outfit_update"
+    ],
+    "title": "DesignBrief",
+    "description": "Current accepted conditions, including turns without a complete outfit."
    },
    "FavoriteOutfitResponse": {
     "properties": {

@@ -168,6 +168,7 @@ private actor LostStylingResponse {
         {"ask_session_id":"\(StylingFixture.session)","answer":"可以配白色鞋子。","item_refs":[],"tokens_used":20}
         """.utf8))
         #expect(response.styling == nil)
+        #expect(response.designBrief == nil)
         #expect(response.answer == "可以配白色鞋子。")
         let continuation = try Endpoints.ask(
             "那鞋子呢？", conversationID: StylingFixture.conversation, requestID: StylingFixture.request
@@ -176,6 +177,43 @@ private actor LostStylingResponse {
         let question = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: data)
         #expect(question.expectedRevision == nil)
         #expect(question.conversationId == StylingFixture.conversation)
+    }
+
+    @Test func conversationRestoresOrdinaryReferencesTripIntentAndConditionsWithoutAnOutfit() async throws {
+        let body = """
+        {"conversation_id":"\(StylingFixture.conversation)","styling":null,
+         "design_brief":{"revision":3,"constraints":{"locked_item_ids":["\(StylingFixture.oldItem)"],
+           "goal":"试试新风格","exploration":true},"needs_outfit_update":true},
+         "messages":[{"id":"\(StylingFixture.message)","ask_session_id":"\(StylingFixture.session)",
+           "role":"assistant","content":"带上这件衬衫。","created_at":"2026-11-15T08:00:00Z",
+           "item_refs":["\(StylingFixture.oldItem)"],
+           "item_ref_snapshots":[{"item_id":"\(StylingFixture.oldItem)","name":"亚麻衬衫",
+             "category":"top","color_main":"white","thumbnail_url":"https://images.example.test/shirt?signature=fresh"}],
+           "trip_intent":{"is_trip":true,"duration_days":3}}]}
+        """
+        let (client, _) = stylingClient { _ in (200, body) }
+        let restored = try await client.send(Endpoints.askConversation(StylingFixture.conversation))
+        let brief = try #require(restored.designBrief)
+        let answer = try #require(restored.messages?.first)
+
+        #expect(restored.styling == nil)
+        #expect(brief.revision == 3)
+        #expect(brief.needsOutfitUpdate)
+        #expect(brief.constraints.lockedItemIds == [StylingFixture.oldItem])
+        #expect(brief.constraints.goal == "试试新风格")
+        #expect(answer.itemRefs == [StylingFixture.oldItem])
+        #expect(answer.itemRefSnapshots?.first?.name == "亚麻衬衫")
+        #expect(answer.itemRefSnapshots?.first?.thumbnailUrl == "https://images.example.test/shirt?signature=fresh")
+        #expect(answer.tripIntent?.isTrip == true)
+        #expect(answer.tripIntent?.durationDays == 3)
+
+        let continuation = try Endpoints.ask(
+            "保留这件，继续搭配", conversationID: restored.conversationId,
+            requestID: StylingFixture.request, expectedRevision: brief.revision
+        )
+        let data = try #require(continuation.body)
+        let question = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: data)
+        #expect(question.expectedRevision == 3)
     }
 
     @Test func scopedMemoryKeepsServerCopyAndExpiryAndAcceptsOldPayloads() throws {

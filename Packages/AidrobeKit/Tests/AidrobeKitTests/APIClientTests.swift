@@ -171,6 +171,7 @@ private func makeClient(
                 ? (200, #"{"item_id":"ok"}"#)
                 : (401, #"{"message":"expired"}"#)
         }
+        let generation = store.generation
         let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/x")) }
         await refreshArrived.wait()
         pending.cancel()
@@ -178,10 +179,13 @@ private func makeClient(
 
         await #expect(throws: CancellationError.self) { try await pending.value }
         #expect(store.tokens == TokenPair(accessToken: "A2", refreshToken: "R2"))
+        #expect(store.generation == generation)
         #expect(events.events.isEmpty)
+        #expect(transport.requests.map { $0.url!.path() } == ["/v1/x", "/v1/auth/refresh"])
 
         let next = try await client.send(Endpoint<Item>(.get, "/v1/x"))
         #expect(next.itemId == "ok")
+        #expect(transport.requests.last?.value(forHTTPHeaderField: "Authorization") == "Bearer A2")
         #expect(transport.requests.filter { $0.url!.path() == "/v1/auth/refresh" }.count == 1)
     }
 

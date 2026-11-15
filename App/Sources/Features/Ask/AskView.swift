@@ -75,8 +75,16 @@ struct AskView<Tools: View>: View {
                     if let styling = model.styling {
                         StylingCard(model: model, styling: styling)
                             .id(styling.outfit.outfitId)
+                    } else if model.designBrief != nil {
+                        VStack(alignment: .leading, spacing: Spacing.row) {
+                            SectionHeading(title: "条件已记下")
+                            DesignConditions(model: model)
+                            Text("继续聊聊，按这些条件生成方案后再采用。")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.secondaryLabel)
+                        }
                     }
-                    if model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil && !model.isRestoring { opening(model) }
+                    if model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil && !model.isRestoring { opening(model) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.screen)
@@ -99,11 +107,11 @@ struct AskView<Tools: View>: View {
         VStack(alignment: .leading, spacing: 6) {
             Text("问问").kicker()
             HStack(alignment: .bottom) {
-                Text(model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil ? "想问衣橱什么？" : "接着问")
+                Text(model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil ? "想问衣橱什么？" : "接着问")
                     .font(.display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
                 Spacer()
-                if !model.entries.isEmpty || model.styling != nil || model.baseOutfit != nil || model.restorationFailure != nil {
+                if !model.entries.isEmpty || model.styling != nil || model.designBrief != nil || model.baseOutfit != nil || model.restorationFailure != nil {
                     Button {
                         Task { await model.startOver() }
                     } label: {
@@ -116,7 +124,7 @@ struct AskView<Tools: View>: View {
                     .accessibilityLabel("新对话")
                 }
             }
-            if model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil {
+            if model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
@@ -249,7 +257,7 @@ private struct StylingCard: View {
             }
             return "已放到今日"
         }
-        if let day = styling.constraints.targetDate, day != JournalDay.today {
+        if let day = model.designConstraints?.targetDate, day > JournalDay.today {
             return "安排在\(Garment.day(day) ?? day)"
         }
         return "就这套，放到今日"
@@ -257,7 +265,12 @@ private struct StylingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.row) {
-            SectionHeading(title: "这一套")
+            SectionHeading(title: model.needsOutfitUpdate ? "上一套搭配" : "这一套")
+            if model.needsOutfitUpdate {
+                Text("条件已记下。继续聊聊，按这些条件更新方案后再采用。")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
             HStack(alignment: .firstTextBaseline) {
                 Text(outfit.title)
                     .font(.display(24, relativeTo: .title2))
@@ -280,7 +293,7 @@ private struct StylingCard: View {
             Text(outfit.reason)
                 .font(.body)
                 .foregroundStyle(Color.secondaryLabel)
-            conditions
+            DesignConditions(model: model)
             pieces
             if model.isUpdatingDesign { ProgressView("正在保存修改…") }
             if let failure = model.actionFailure {
@@ -300,7 +313,7 @@ private struct StylingCard: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .disabled(model.isBusy || model.needsLatestVersion || styling.status == .adopted)
+                .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate || styling.status == .adopted)
                 Menu {
                     Button(
                         actions.favoriteOutfitIDs.contains(outfit.outfitId) ? "取消收藏" : "收藏这套",
@@ -350,45 +363,6 @@ private struct StylingCard: View {
         }
     }
 
-    @ViewBuilder private var conditions: some View {
-        let constraints = styling.constraints
-        VStack(alignment: .leading, spacing: Spacing.tight) {
-            if let day = constraints.targetDate, let date = Garment.day(day) {
-                Text("准备在\(date)穿")
-            }
-            if let goal = constraints.goal, !goal.isEmpty {
-                Text("这次想要：\(goal)")
-            }
-            if let style = constraints.targetStyle, !style.isEmpty, style != constraints.goal {
-                Text("想尝试：\(style)")
-            }
-            if constraints.exploration == true {
-                Text("这是本次尝试，不会自动改掉长期偏好。")
-            }
-            ForEach(Array((constraints.notes ?? []).enumerated()), id: \.offset) { _, note in
-                Text(note)
-            }
-            if !model.excludedItemIDs.isEmpty {
-                Text("这次不用")
-                    .foregroundStyle(Color.tertiaryLabel)
-                FlowLayout {
-                    ForEach(model.excludedItemIDs, id: \.self) { id in
-                        Button {
-                            Task { await model.removeExclusion(id) }
-                        } label: {
-                            Label(model.itemName(id), systemImage: "xmark")
-                        }
-                        .buttonStyle(.bordered)
-                        .disabled(model.isBusy || model.needsLatestVersion)
-                        .accessibilityLabel("取消本次排除：\(model.itemName(id))")
-                    }
-                }
-            }
-        }
-        .font(.subheadline)
-        .foregroundStyle(Color.secondaryLabel)
-    }
-
     private var pieces: some View {
         VStack(spacing: 0) {
             ForEach(actions.boardItems(for: outfit)) { item in
@@ -413,7 +387,7 @@ private struct StylingCard: View {
                             .font(.subheadline)
                             .frame(minHeight: 44)
                     }
-                    .disabled(model.isBusy || model.needsLatestVersion)
+                    .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate)
                     .accessibilityLabel("调整\(item.name)")
                 }
                 Divider().overlay(Color.separator)
@@ -422,10 +396,59 @@ private struct StylingCard: View {
     }
 
     private func openReplacement(_ item: BoardItem) {
-        guard !model.isBusy, !model.needsLatestVersion else { return }
+        guard !model.isBusy, !model.needsLatestVersion, !model.needsOutfitUpdate else { return }
         if model.lockedItemIDs.contains(item.itemID) {
             model.notice = "这件已经保留。取消保留后，可以再换一件。"
         } else { swapTarget = StylingSwapTarget(outfit: outfit, item: item) }
+    }
+}
+
+private struct DesignConditions: View {
+    let model: AskModel
+
+    var body: some View {
+        if let constraints = model.designConstraints {
+            VStack(alignment: .leading, spacing: Spacing.tight) {
+                if let day = constraints.targetDate, let date = Garment.day(day) {
+                    if day < JournalDay.today {
+                        Text("这份计划的日期已过，采用时会放到今日。")
+                    } else { Text("准备在\(date)穿") }
+                }
+                if let goal = constraints.goal, !goal.isEmpty {
+                    Text("这次想要：\(goal)")
+                }
+                if let style = constraints.targetStyle, !style.isEmpty, style != constraints.goal {
+                    Text("想尝试：\(style)")
+                }
+                if constraints.exploration == true {
+                    Text("这是本次尝试，不会自动改掉长期偏好。")
+                }
+                ForEach(Array((constraints.notes ?? []).enumerated()), id: \.offset) { _, note in
+                    Text(note)
+                }
+                if !model.lockedItemIDs.isEmpty {
+                    Text("保留：\(model.lockedItemIDs.map(model.itemName).joined(separator: "、"))")
+                }
+                if !model.excludedItemIDs.isEmpty {
+                    Text("这次不用")
+                        .foregroundStyle(Color.tertiaryLabel)
+                    FlowLayout {
+                        ForEach(model.excludedItemIDs, id: \.self) { id in
+                            Button {
+                                Task { await model.removeExclusion(id) }
+                            } label: {
+                                Label(model.itemName(id), systemImage: "xmark")
+                            }
+                            .buttonStyle(.bordered)
+                            .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate)
+                            .accessibilityLabel("取消本次排除：\(model.itemName(id))")
+                        }
+                    }
+                }
+            }
+            .font(.subheadline)
+            .foregroundStyle(Color.secondaryLabel)
+        }
     }
 }
 

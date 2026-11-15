@@ -52,6 +52,7 @@ final class AskModel {
     private(set) var entries: [Entry] = []
     private(set) var history: [Wire.AskHistoryItem] = []
     private(set) var styling: Wire.StylingResponse?
+    private(set) var designBrief: Wire.DesignBrief?
     private(set) var baseOutfit: Wire.OutfitResponse?
     private(set) var conversationID: String?
     private(set) var isRestoring = false
@@ -99,10 +100,13 @@ final class AskModel {
         }
     }
     var canAsk: Bool { !isBusy && !needsLatestVersion && !hasUnresolvedQuestion }
-    var canRetryAction: Bool { retryAction != nil && !needsLatestVersion }
+    var canRetryAction: Bool { retryAction != nil && !needsLatestVersion && !needsOutfitUpdate }
     var canRetryRestore: Bool { restoringID != nil || conversationID != nil }
-    var lockedItemIDs: [String] { styling?.constraints.lockedItemIds ?? [] }
-    var excludedItemIDs: [String] { styling?.constraints.excludedItemIds ?? [] }
+    var designConstraints: Wire.StylingConstraints? { designBrief?.constraints ?? styling?.constraints }
+    var expectedRevision: Int? { designBrief?.revision ?? styling?.revision }
+    var needsOutfitUpdate: Bool { designBrief?.needsOutfitUpdate ?? false }
+    var lockedItemIDs: [String] { designConstraints?.lockedItemIds ?? [] }
+    var excludedItemIDs: [String] { designConstraints?.excludedItemIds ?? [] }
 
     var earlier: [Wire.AskHistoryItem] {
         let shown = Set(entries.compactMap { entry -> String? in
@@ -131,7 +135,7 @@ final class AskModel {
         guard !question.isEmpty, canAsk else { return }
         let entry = Entry(
             question: question, state: .asking, conversationID: conversationID,
-            expectedRevision: styling?.revision,
+            expectedRevision: expectedRevision,
             baseOutfitID: baseOutfit?.outfitId
         )
         entries.append(entry)
@@ -155,6 +159,7 @@ final class AskModel {
             baseOutfit = nil
             conversationID = answer.conversationId ?? conversationID
             if let result = answer.styling { acceptRevision(result) }
+            acceptBrief(answer.designBrief)
             if let conversationID { bookmark?.save(conversationID) }
         } catch {
             guard isCurrent(expectedEpoch), let index = entries.firstIndex(where: { $0.id == entryID }) else { return }
@@ -176,7 +181,7 @@ final class AskModel {
         if entries[index].needsRebase {
             entries[index].requestID = UUID().uuidString
             entries[index].conversationID = conversationID
-            entries[index].expectedRevision = styling?.revision
+            entries[index].expectedRevision = expectedRevision
             entries[index].baseOutfitID = nil
             entries[index].needsRebase = false
         }
@@ -202,6 +207,7 @@ final class AskModel {
         epoch = UUID()
         entries = []
         styling = nil
+        designBrief = nil
         baseOutfit = nil
         conversationID = nil
         restoringID = nil
@@ -258,13 +264,13 @@ final class AskModel {
             for message in result.messages ?? [] {
                 if message.role == "user" { question = message.content }
                 else if message.role == "assistant" {
-                    let ids = message.styling?.outfit.items.map(\.itemId) ?? []
+                    let ids = message.itemRefs ?? message.styling?.outfit.items.map(\.itemId) ?? []
                     restored.append(Entry(
                         id: UUID(uuidString: message.id) ?? UUID(),
                         question: question ?? "调整后的搭配",
                         state: .answered(
                             sessionID: message.askSessionId, text: message.content,
-                            garments: garments(ids: ids, snapshots: [])
+                            garments: garments(ids: ids, snapshots: message.itemRefSnapshots ?? [])
                         ), styling: message.styling
                     ))
                     question = nil
@@ -274,6 +280,7 @@ final class AskModel {
             conversationID = result.conversationId
             baseOutfit = nil
             styling = result.styling
+            designBrief = result.designBrief
             if let result = result.styling {
                 outfitActions.syncOutfit(result.outfit, recommendationDate: result.recommendationDate)
             }
@@ -306,6 +313,7 @@ final class AskModel {
             guard isCurrent(expectedEpoch), conversationID == id, !Task.isCancelled else { return }
             if let result = result.styling { acceptRevision(result) }
             else { styling = nil }
+            acceptBrief(result.designBrief)
             needsLatestVersion = false
             restorationFailure = nil
         } catch {
@@ -318,9 +326,10 @@ final class AskModel {
 
     func acceptRevision(_ result: Wire.StylingResponse) {
         guard accountGeneration == AccountLocalData.generation else { return }
-        if let styling, styling.conversationId == result.conversationId, styling.revision > result.revision { return }
+        if conversationID == result.conversationId, let expectedRevision, expectedRevision > result.revision { return }
         let isNewRevision = styling?.conversationId != result.conversationId || styling?.revision != result.revision
         styling = result
+        designBrief = .init(revision: result.revision, constraints: result.constraints, needsOutfitUpdate: false)
         conversationID = result.conversationId
         outfitActions.syncOutfit(result.outfit, recommendationDate: result.recommendationDate)
         bookmark?.save(result.conversationId)
@@ -332,6 +341,15 @@ final class AskModel {
         }
     }
 
+    private func acceptBrief(_ result: Wire.DesignBrief?) {
+        guard let result, result.revision >= (designBrief?.revision ?? 0) else { return }
+        if result.revision != designBrief?.revision {
+            actionRequestIDs = [:]
+            retryAction = nil
+        }
+        designBrief = result
+    }
+
     func adopt() async { await perform(.adopt) }
     func toggleLock(_ itemID: String) async { await perform(.toggleLock(itemID)) }
     func removeExclusion(_ itemID: String) async { await perform(.removeExclusion(itemID)) }
@@ -341,9 +359,10 @@ final class AskModel {
     }
 
     private func perform(_ action: DesignAction) async {
-        guard !isBusy, !needsLatestVersion, let current = styling else { return }
+        guard !isBusy, !needsLatestVersion, !needsOutfitUpdate, let current = styling else { return }
         let expectedEpoch = epoch
-        let key = "\(current.conversationId)|\(current.revision)|\(String(describing: action))"
+        let revision = expectedRevision ?? current.revision
+        let key = "\(current.conversationId)|\(revision)|\(String(describing: action))"
         let requestID = actionRequestIDs[key] ?? UUID().uuidString
         actionRequestIDs[key] = requestID
         retryAction = action
@@ -355,20 +374,20 @@ final class AskModel {
             switch action {
             case .adopt:
                 endpoint = try Endpoints.adoptStyling(
-                    conversationID: current.conversationId, revision: current.revision,
-                    requestID: requestID, date: current.constraints.targetDate
+                    conversationID: current.conversationId, revision: revision,
+                    requestID: requestID, date: designConstraints?.targetDate
                 )
             case let .toggleLock(itemID):
-                var ids = Set(current.constraints.lockedItemIds ?? [])
+                var ids = Set(lockedItemIDs)
                 if !ids.insert(itemID).inserted { ids.remove(itemID) }
                 endpoint = try Endpoints.reviseStylingConstraints(
-                    conversationID: current.conversationId, revision: current.revision,
+                    conversationID: current.conversationId, revision: revision,
                     lockedItemIDs: ids.sorted(), requestID: requestID
                 )
             case let .removeExclusion(itemID):
                 endpoint = try Endpoints.reviseStylingConstraints(
-                    conversationID: current.conversationId, revision: current.revision,
-                    excludedItemIDs: (current.constraints.excludedItemIds ?? []).filter { $0 != itemID },
+                    conversationID: current.conversationId, revision: revision,
+                    excludedItemIDs: excludedItemIDs.filter { $0 != itemID },
                     requestID: requestID
                 )
             }
