@@ -17,11 +17,11 @@ public struct StylingExperienceState: Sendable {
 
     public init(_ result: Wire.StylingExperienceListResponse) {
         appreciated = result.items.first { $0.kind == .appreciated }
-        wantToTry = result.items.first { $0.kind == .want_to_try }
+        wantToTry = result.items.first { $0.kind == .wantToTry }
         wornDate = result.latestWornDate
         // An intention or an adopted plan never unlocks a wear reflection.
         wearFeedback = result.latestWornDate.flatMap { day in
-            result.items.first { $0.kind == .wear_feedback && $0.wornDate == day }
+            result.items.first { $0.kind == .wearFeedback && $0.wornDate == day }
         }
     }
 }

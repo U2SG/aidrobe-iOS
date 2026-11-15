@@ -63,7 +63,7 @@ private func experienceJSON(_ kind: String, id: String, day: String? = nil, feed
           "linked_result":{"kind":"packing_list","resource_id":"\(referenceID)","source_revision":3,"summary":"排好了三天的行程"}
         }]}
         """.utf8))
-        #expect(result.messages?.first?.linkedResult?.kind == .packing_list)
+        #expect(result.messages?.first?.linkedResult?.kind == .packingList)
         #expect(result.messages?.first?.linkedResult?.resourceId == referenceID)
         #expect(result.messages?.first?.styling == nil)
         #expect(result.messages?.first?.askSessionId == nil)
@@ -90,7 +90,7 @@ private func experienceJSON(_ kind: String, id: String, day: String? = nil, feed
           \(experienceJSON("wear_feedback", id: "current", day: "2026-11-15", feedback: "like"))],"latest_worn_date":"2026-11-15"}
         """.utf8))
         #expect(StylingExperienceState(result).wearFeedback?.experienceId == "current")
-        var replacement = Wire.StylingExperienceRequest(requestId: requestID, outfitId: outfitID, kind: .wear_feedback)
+        var replacement = Wire.StylingExperienceRequest(requestId: requestID, outfitId: outfitID, kind: .wearFeedback)
         replacement.wornDate = "2026-11-15"
         replacement.feedback = .neutral
         replacement.supersedesId = "current"

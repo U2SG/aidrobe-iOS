@@ -632,7 +632,7 @@ private struct LinkedDesignResultView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.control) {
             Text(result.summary).font(.body).foregroundStyle(Color.secondaryLabel)
-            if result.kind == .purchase_decision {
+            if result.kind == .purchaseDecision {
                 if app.environment.flags.purchaseDecision {
                     NavigationLink("查看购买参考") { ShouldIBuyView(decisionID: result.resourceId) }
                 }

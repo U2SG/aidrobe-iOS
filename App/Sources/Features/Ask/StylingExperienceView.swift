@@ -35,7 +35,7 @@ struct StylingExperienceView: View {
                             Task { await toggle(.appreciated, existing: state.appreciated) }
                         }
                         Chip(title: "想试试", isSelected: state.wantToTry != nil) {
-                            Task { await toggle(.want_to_try, existing: state.wantToTry) }
+                            Task { await toggle(.wantToTry, existing: state.wantToTry) }
                         }
                     }
                     .disabled(isSaving)
@@ -94,7 +94,7 @@ struct StylingExperienceView: View {
                 .lineLimit(2...6)
                 .textFieldStyle(.roundedBorder)
                 .onChange(of: note) { if note.count > 500 { note = String(note.prefix(500)) } }
-            Button("记下感受") { Task { await save(.wear_feedback) } }
+            Button("记下感受") { Task { await save(.wearFeedback) } }
                 .buttonStyle(.glass)
         }
         .disabled(isSaving)
@@ -145,7 +145,7 @@ struct StylingExperienceView: View {
             body.conversationId = conversationID
             body.revision = revision
         }
-        if kind == .wear_feedback {
+        if kind == .wearFeedback {
             guard let day = state.wornDate else { return }
             body.wornDate = day
             body.feedback = .init(rawValue: feeling)
