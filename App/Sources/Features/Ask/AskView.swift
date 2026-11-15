@@ -38,6 +38,11 @@ struct AskView<Tools: View>: View {
                 model?.beginDesign(from: outfit)
                 app.outfitToDiscuss = nil
             }
+            if let referenceID = app.referenceToDiscuss {
+                model?.beginDesign(referenceID: referenceID)
+                draft = "参考这张图，帮我用衣橱搭一套"
+                app.referenceToDiscuss = nil
+            }
             await model?.load()
         }
     }
@@ -70,7 +75,11 @@ struct AskView<Tools: View>: View {
                         }
                     }
                     ForEach(model.entries) { entry in
-                        AskEntryView(entry: entry, model: model).id(entry.id)
+                        if let linked = entry.linkedResult {
+                            LinkedDesignResultView(result: linked).id(entry.id)
+                        } else {
+                            AskEntryView(entry: entry, model: model).id(entry.id)
+                        }
                     }
                     if let styling = model.styling {
                         StylingCard(model: model, styling: styling)
@@ -82,6 +91,7 @@ struct AskView<Tools: View>: View {
                             Text("继续聊聊，按这些条件生成方案后再采用。")
                                 .font(.subheadline)
                                 .foregroundStyle(Color.secondaryLabel)
+                            DesignNextSteps(model: model)
                         }
                     }
                     if model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil && !model.isRestoring { opening(model) }
@@ -111,8 +121,9 @@ struct AskView<Tools: View>: View {
                     .font(.display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
                 Spacer()
-                if !model.entries.isEmpty || model.styling != nil || model.designBrief != nil || model.baseOutfit != nil || model.restorationFailure != nil {
+                if !model.entries.isEmpty || model.styling != nil || model.designBrief != nil || model.baseOutfit != nil || model.referenceDraftID != nil || model.restorationFailure != nil {
                     Button {
+                        draft = ""
                         Task { await model.startOver() }
                     } label: {
                         Image(systemName: "square.and.pencil")
@@ -181,6 +192,18 @@ struct AskView<Tools: View>: View {
 
     private func inputBar(_ model: AskModel) -> some View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
+            if model.referenceDraftID != nil {
+                HStack {
+                    Text("参考了灵感图").font(.footnote).foregroundStyle(Color.secondaryLabel)
+                    Spacer()
+                    Button("不参考这张图") {
+                        model.clearReferenceDraft()
+                        if draft == "参考这张图，帮我用衣橱搭一套" { draft = "" }
+                    }
+                        .font(.footnote)
+                        .disabled(model.isBusy)
+                }
+            }
             if model.hasUnresolvedQuestion {
                 Text("上一句还没确认结果。请重试那一句，或开启新对话后再聊。")
                     .font(.footnote)
@@ -334,6 +357,15 @@ private struct StylingCard: View {
                 .disabled(model.isBusy)
                 .accessibilityLabel("这套搭配的操作")
             }
+            if !model.needsOutfitUpdate {
+                StylingExperienceView(
+                    outfitID: outfit.outfitId, conversationID: styling.conversationId,
+                    revision: styling.revision, refreshID: actions.wornOutfitIDs.contains(outfit.outfitId)
+                )
+                .id(outfit.outfitId)
+                .disabled(model.isBusy)
+            }
+            DesignNextSteps(model: model)
         }
         .task(id: outfit.outfitId) { await actions.loadGeneratedImage(for: outfit.outfitId) }
         .sheet(item: $swapTarget) { target in
@@ -422,6 +454,10 @@ private struct DesignConditions: View {
                 }
                 if constraints.exploration == true {
                     Text("这是本次尝试，不会自动改掉长期偏好。")
+                }
+                if constraints.referenceInspirationId != nil {
+                    Text("参考了灵感图")
+                        .font(.caption).foregroundStyle(Color.secondaryLabel)
                 }
                 ForEach(Array((constraints.notes ?? []).enumerated()), id: \.offset) { _, note in
                     Text(note)
@@ -568,5 +604,42 @@ private struct AskEntryView: View {
                 }
             }
         }
+    }
+}
+
+private struct DesignNextSteps: View {
+    let model: AskModel
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        if let context = model.designContext {
+            VStack(alignment: .leading, spacing: Spacing.control) {
+                if app.environment.flags.purchaseDecision {
+                    NavigationLink("看看要不要添一件") { ShouldIBuyView(designContext: context) }
+                }
+                NavigationLink("带着这些想法去旅行") { PackingListsView(designContext: context) }
+            }
+            .font(.subheadline)
+            .disabled(model.isBusy || model.hasUnresolvedQuestion || model.needsLatestVersion)
+        }
+    }
+}
+
+private struct LinkedDesignResultView: View {
+    let result: Wire.LinkedDesignResult
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.control) {
+            Text(result.summary).font(.body).foregroundStyle(Color.secondaryLabel)
+            if result.kind == .purchase_decision {
+                if app.environment.flags.purchaseDecision {
+                    NavigationLink("查看购买参考") { ShouldIBuyView(decisionID: result.resourceId) }
+                }
+            } else {
+                NavigationLink("查看打包清单") { PackingListsView(initialListID: result.resourceId) }
+            }
+        }
+        .padding(.vertical, Spacing.control)
     }
 }

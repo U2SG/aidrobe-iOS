@@ -24,15 +24,18 @@ final class AskModel {
         var state: State
         var feedback: FeedbackKind?
         var styling: Wire.StylingResponse?
+        var linkedResult: Wire.LinkedDesignResult?
         var requestID: String
         var conversationID: String?
         var expectedRevision: Int?
         var baseOutfitID: String?
+        var referenceInspirationID: String?
         var needsRebase = false
 
         init(
             id: UUID = UUID(), question: String, state: State, styling: Wire.StylingResponse? = nil,
-            conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil
+            conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil,
+            referenceInspirationID: String? = nil, linkedResult: Wire.LinkedDesignResult? = nil
         ) {
             self.id = id
             self.question = question
@@ -42,6 +45,8 @@ final class AskModel {
             self.conversationID = conversationID
             self.expectedRevision = expectedRevision
             self.baseOutfitID = baseOutfitID
+            self.referenceInspirationID = referenceInspirationID
+            self.linkedResult = linkedResult
         }
     }
 
@@ -54,6 +59,7 @@ final class AskModel {
     private(set) var styling: Wire.StylingResponse?
     private(set) var designBrief: Wire.DesignBrief?
     private(set) var baseOutfit: Wire.OutfitResponse?
+    private(set) var referenceDraftID: String?
     private(set) var conversationID: String?
     private(set) var isRestoring = false
     private(set) var isUpdatingDesign = false
@@ -107,6 +113,10 @@ final class AskModel {
     var needsOutfitUpdate: Bool { designBrief?.needsOutfitUpdate ?? false }
     var lockedItemIDs: [String] { designConstraints?.lockedItemIds ?? [] }
     var excludedItemIDs: [String] { designConstraints?.excludedItemIds ?? [] }
+    var designContext: Wire.DesignContextRef? {
+        guard let conversationID, let expectedRevision else { return nil }
+        return .init(conversationId: conversationID, expectedRevision: expectedRevision)
+    }
 
     var earlier: [Wire.AskHistoryItem] {
         let shown = Set(entries.compactMap { entry -> String? in
@@ -122,7 +132,7 @@ final class AskModel {
         if let loaded = try? await api.send(Endpoints.askHistory()), isCurrent(expectedEpoch) { history = loaded }
         await wardrobeLoad
         guard isCurrent(expectedEpoch), !isBusy, !Task.isCancelled else { return }
-        if baseOutfit != nil, conversationID == nil { return }
+        if (baseOutfit != nil || referenceDraftID != nil), conversationID == nil { return }
         if let saved = bookmark?.conversationID, saved != conversationID || entries.isEmpty {
             await restore(saved)
         } else if let conversationID {
@@ -136,7 +146,8 @@ final class AskModel {
         let entry = Entry(
             question: question, state: .asking, conversationID: conversationID,
             expectedRevision: expectedRevision,
-            baseOutfitID: baseOutfit?.outfitId
+            baseOutfitID: baseOutfit?.outfitId,
+            referenceInspirationID: conversationID == nil ? referenceDraftID : nil
         )
         entries.append(entry)
         await send(entry.id)
@@ -148,7 +159,8 @@ final class AskModel {
         do {
             let answer = try await api.send(Endpoints.ask(
                 entry.question, conversationID: entry.conversationID, requestID: entry.requestID,
-                expectedRevision: entry.expectedRevision, baseOutfitID: entry.baseOutfitID
+                expectedRevision: entry.expectedRevision, baseOutfitID: entry.baseOutfitID,
+                referenceInspirationID: entry.referenceInspirationID
             ))
             guard isCurrent(expectedEpoch), let index = entries.firstIndex(where: { $0.id == entryID }) else { return }
             entries[index].state = .answered(
@@ -157,6 +169,7 @@ final class AskModel {
             )
             entries[index].styling = answer.styling
             baseOutfit = nil
+            referenceDraftID = nil
             conversationID = answer.conversationId ?? conversationID
             if let result = answer.styling { acceptRevision(result) }
             acceptBrief(answer.designBrief)
@@ -203,12 +216,20 @@ final class AskModel {
         baseOutfit = outfit
     }
 
+    func beginDesign(referenceID: String) {
+        resetConversation()
+        referenceDraftID = referenceID
+    }
+
+    func clearReferenceDraft() { referenceDraftID = nil }
+
     private func resetConversation() {
         epoch = UUID()
         entries = []
         styling = nil
         designBrief = nil
         baseOutfit = nil
+        referenceDraftID = nil
         conversationID = nil
         restoringID = nil
         restorationFailure = nil
@@ -262,7 +283,9 @@ final class AskModel {
             var restored: [Entry] = []
             var question: String?
             for message in result.messages ?? [] {
-                if message.role == "user" { question = message.content }
+                if let linked = message.linkedResult {
+                    restored.append(linkedEntry(message, linked))
+                } else if message.role == "user" { question = message.content }
                 else if message.role == "assistant" {
                     let ids = message.itemRefs ?? message.styling?.outfit.items.map(\.itemId) ?? []
                     restored.append(Entry(
@@ -279,6 +302,7 @@ final class AskModel {
             entries = restored
             conversationID = result.conversationId
             baseOutfit = nil
+            referenceDraftID = nil
             styling = result.styling
             designBrief = result.designBrief
             if let result = result.styling {
@@ -314,6 +338,14 @@ final class AskModel {
             if let result = result.styling { acceptRevision(result) }
             else { styling = nil }
             acceptBrief(result.designBrief)
+            let linked = (result.messages ?? []).compactMap { message -> Entry? in
+                guard let result = message.linkedResult else { return nil }
+                return linkedEntry(message, result)
+            }
+            let byID = Dictionary(linked.map { ($0.id, $0) }, uniquingKeysWith: { _, latest in latest })
+            entries = entries.compactMap { $0.linkedResult == nil ? $0 : byID[$0.id] }
+            let known = Set(entries.map(\.id))
+            entries.append(contentsOf: linked.filter { !known.contains($0.id) })
             needsLatestVersion = false
             restorationFailure = nil
         } catch {
@@ -322,6 +354,13 @@ final class AskModel {
             needsLatestVersion = true
             restorationFailure = "没能读取这套的最新修改。请重试，已经保存的方案仍然保留。"
         }
+    }
+
+    private func linkedEntry(_ message: Wire.AskConversationMessage, _ linked: Wire.LinkedDesignResult) -> Entry {
+        Entry(
+            id: UUID(uuidString: message.id) ?? UUID(), question: "",
+            state: .answered(sessionID: nil, text: linked.summary, garments: []), linkedResult: linked
+        )
     }
 
     func acceptRevision(_ result: Wire.StylingResponse) {

@@ -7,9 +7,16 @@ import SwiftUI
 /// does the same job, what it would go with, and how sure that reading is.
 /// The verdict wording is the server's; this page only lays it out.
 struct ShouldIBuyView: View {
+    let designContext: Wire.DesignContextRef?
+    let decisionID: String?
     @Environment(AppModel.self) private var app
     @State private var model: ShouldIBuyModel?
     @State private var picked: PhotosPickerItem?
+
+    init(designContext: Wire.DesignContextRef? = nil, decisionID: String? = nil) {
+        self.designContext = designContext
+        self.decisionID = decisionID
+    }
 
     var body: some View {
         // ZStack, not Group: the task that creates the model must attach to something.
@@ -27,11 +34,16 @@ struct ShouldIBuyView: View {
                         action: "再看看"
                     ) { Task { await model.resume(candidateID: candidateID) } }
                 case let .decided(decision):
-                    DecisionPage(decision: decision, model: model)
+                    DecisionPage(decision: decision, model: model, canStartNew: decisionID == nil)
                 case .unavailable:
                     notice(title: "暂时用不了", message: "这个功能现在没有开放，晚些时候再来。", action: nil) {}
                 case let .failed(message):
-                    notice(title: "这次没问成", message: message, action: "重新开始") { model.startOver() }
+                    notice(title: decisionID == nil ? "这次没问成" : "没能取回这次判断", message: message,
+                           action: model.contextConflict ? nil : (decisionID != nil ? "重新读取" : model.pendingCandidateID != nil ? "再试一次" : "重新开始")) {
+                        if let decisionID { Task { await model.replay(decisionID: decisionID) } }
+                        else if let candidateID = model.pendingCandidateID { Task { await model.resume(candidateID: candidateID) } }
+                        else { model.startOver() }
+                    }
                 }
             }
         }
@@ -40,8 +52,17 @@ struct ShouldIBuyView: View {
         .navigationTitle("该不该买")
         .navigationBarTitleDisplayMode(.inline)
         .task {
-            if model == nil { model = ShouldIBuyModel(api: app.api) }
+            if model == nil {
+                model = ShouldIBuyModel(api: app.api, designContext: designContext)
+                if let decisionID { await model?.replay(decisionID: decisionID) }
+            }
             if app.wardrobe.items.isEmpty { await app.wardrobe.load() }
+        }
+        .safeAreaInset(edge: .bottom) {
+            if let model, model.contextConflict, let designContext {
+                Button("回到这段对话") { app.resumeDesign(designContext.conversationId) }
+                    .buttonStyle(.glassProminent).padding(Spacing.screen)
+            }
         }
         .onChange(of: picked) { _, item in
             guard let item else { return }
@@ -69,6 +90,10 @@ struct ShouldIBuyView: View {
                     Text("给一张衣物照片或截图，看看衣橱里有没有能替它的，它又能和什么搭。结论只是参考，买不买你说了算。")
                         .font(.body)
                         .foregroundStyle(Color.secondaryLabel)
+                    if designContext != nil {
+                        Text("会带上这段对话里的条件。")
+                            .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                    }
                 }
                 VStack(alignment: .leading, spacing: Spacing.control) {
                     SectionHeading(title: "最拿不准的是")
@@ -85,7 +110,7 @@ struct ShouldIBuyView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                if !model.history.isEmpty {
+                if designContext == nil, !model.history.isEmpty {
                     asked(model)
                 }
             }
@@ -173,6 +198,7 @@ struct ShouldIBuyView: View {
 private struct DecisionPage: View {
     let decision: Wire.WardrobeDecisionResponse
     let model: ShouldIBuyModel
+    let canStartNew: Bool
     @Environment(AppModel.self) private var app
 
     private var similar: [Wire.ComparisonItemModel] { decision.closetComparison.similarItems ?? [] }
@@ -185,9 +211,20 @@ private struct DecisionPage: View {
                 comparison
                 confidence
                 yourCall
-                Button("再问一件") { model.startOver() }
-                    .buttonStyle(.glass)
-                    .controlSize(.large)
+                if let context = model.designContext,
+                   !DesignContinuity.matches(context, decision.designContext) {
+                    Text("这次结果没有带上原对话的条件，可以回去继续。")
+                        .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                }
+                if let conversationID = model.designContext?.conversationId ?? decision.designContext?.conversationId {
+                    Button("回到这段对话") { app.resumeDesign(conversationID) }
+                        .buttonStyle(.glassProminent)
+                }
+                if canStartNew {
+                    Button("再问一件") { model.startOver() }
+                        .buttonStyle(.glass)
+                        .controlSize(.large)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)

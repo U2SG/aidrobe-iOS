@@ -9,7 +9,8 @@ extension Endpoints {
         conversationID: String? = nil,
         requestID: String? = nil,
         expectedRevision: Int? = nil,
-        baseOutfitID: String? = nil
+        baseOutfitID: String? = nil,
+        referenceInspirationID: String? = nil
     ) throws -> Endpoint<Wire.AskResponse> {
         var body = Wire.AskRequest(question: question)
         body.locale = "zh-CN"
@@ -18,6 +19,9 @@ extension Endpoints {
         body.requestId = requestID
         body.expectedRevision = expectedRevision
         body.baseOutfitId = baseOutfitID
+        if let referenceInspirationID {
+            body.constraints = .init(referenceInspirationId: referenceInspirationID)
+        }
         return try Endpoint(
             .post,
             "/v1/ask",

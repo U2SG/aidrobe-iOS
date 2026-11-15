@@ -10,6 +10,7 @@
 		07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8587F1AAA07682D6879F836A /* TodaySheets.swift */; };
 		0E2B483E16E827DF76806B3A /* ShouldIBuyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */; };
 		110BDCEBA9F515D02888274C /* PrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */; };
+		5F23D39B6B2A46058D883A4E /* StylingExperienceView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 203E28469C4B4251A1E4AA30 /* StylingExperienceView.swift */; };
 		178C1D2F419675454C2C0638 /* AskModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */; };
 		1B71D9A98FAB606B95DA4977 /* OutfitShareSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = C55B817D837B476FB900D829 /* OutfitShareSheet.swift */; };
 		21DB1450233AE8F381B51641 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F4CDE3FF36CF199E05DF8B9 /* Theme.swift */; };
@@ -65,6 +66,7 @@
 		01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectLiftLab.swift; sourceTree = "<group>"; };
 		099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutfitRecordView.swift; sourceTree = "<group>"; };
 		0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingListsView.swift; sourceTree = "<group>"; };
+		203E28469C4B4251A1E4AA30 /* StylingExperienceView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StylingExperienceView.swift; sourceTree = "<group>"; };
 		0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskModel.swift; sourceTree = "<group>"; };
 		176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShouldIBuyView.swift; sourceTree = "<group>"; };
 		24A775BD53C5838DA407C7DD /* InsightsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = InsightsView.swift; sourceTree = "<group>"; };
@@ -214,6 +216,7 @@
 			isa = PBXGroup;
 			children = (
 				0EA80A62A0BE6725D5D0A4E5 /* AskModel.swift */,
+				203E28469C4B4251A1E4AA30 /* StylingExperienceView.swift */,
 				F038BBD453873CAB8D0919C6 /* AskView.swift */,
 			);
 			path = Ask;
@@ -459,6 +462,7 @@
 				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
 				24BD0766FCBF271765CB3E44 /* AppleSignInButton.swift in Sources */,
 				178C1D2F419675454C2C0638 /* AskModel.swift in Sources */,
+				5F23D39B6B2A46058D883A4E /* StylingExperienceView.swift in Sources */,
 				E9896DB0D562D55FB5F5E9A4 /* AskView.swift in Sources */,
 				FBFA0F1041DA2F131C402C10 /* Components.swift in Sources */,
 				C2E4C587988D1E6B0781D099 /* GarmentImage.swift in Sources */,

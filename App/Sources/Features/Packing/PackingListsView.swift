@@ -3,10 +3,18 @@ import SwiftUI
 
 /// Trips: what to bring from your own wardrobe, and what is already in the bag.
 struct PackingListsView: View {
+    let designContext: Wire.DesignContextRef?
+    let initialListID: String?
     @Environment(AppModel.self) private var app
     @State private var model: PackingModel?
     @State private var isCreating = false
     @State private var opened: String?
+    @State private var openedInitial = false
+
+    init(designContext: Wire.DesignContextRef? = nil, initialListID: String? = nil) {
+        self.designContext = designContext
+        self.initialListID = initialListID
+    }
 
     var body: some View {
         // ZStack, not Group: the task that creates the model must attach to something.
@@ -25,7 +33,19 @@ struct PackingListsView: View {
                     } description: {
                         Text(message)
                     } actions: {
-                        Button("再试一次") { Task { await model.load() } }
+                        Button("再试一次") { Task {
+                            if let initialListID {
+                                await model.loadOne(initialListID)
+                                if model.phase == .loaded { opened = initialListID; openedInitial = true }
+                            }
+                            else {
+                                await model.load()
+                                if designContext != nil, !openedInitial, model.phase == .loaded {
+                                    isCreating = true
+                                    openedInitial = true
+                                }
+                            }
+                        } }
                             .buttonStyle(.glass)
                     }
                 case .loaded:
@@ -49,15 +69,21 @@ struct PackingListsView: View {
         }
         .sheet(isPresented: $isCreating) {
             if let model {
-                NewTripSheet(model: model) { opened = $0 }
+                NewTripSheet(model: model, designContext: designContext) { opened = $0 }
             }
         }
         .toast(Binding(get: { model?.notice }, set: { model?.notice = $0 }))
         .task {
             if model == nil { model = PackingModel(api: app.api) }
             async let wardrobe: Void = app.wardrobe.items.isEmpty ? app.wardrobe.load() : ()
-            await model?.load()
+            if let initialListID { await model?.loadOne(initialListID) }
+            else { await model?.load() }
             await wardrobe
+            if !openedInitial, model?.phase == .loaded {
+                openedInitial = true
+                if let initialListID { opened = initialListID }
+                else if designContext != nil { isCreating = true }
+            }
         }
     }
 
@@ -135,8 +161,10 @@ private struct TripRow: View {
 /// Where, how long, and what for. The backend builds the list on create.
 private struct NewTripSheet: View {
     let model: PackingModel
+    let designContext: Wire.DesignContextRef?
     let onCreated: (String) -> Void
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppModel.self) private var app
     @State private var destination = ""
     @State private var days = 3
     @State private var hasDate = false
@@ -147,6 +175,13 @@ private struct NewTripSheet: View {
     var body: some View {
         NavigationStack {
             Form {
+                if let designContext {
+                    Section {
+                        Text("会带上这段对话里的条件。")
+                            .foregroundStyle(Color.secondaryLabel)
+                        Button("回到这段对话") { app.resumeDesign(designContext.conversationId) }
+                    }
+                }
                 Section {
                     TextField("去哪里（可以不填）", text: $destination)
                     Stepper("去 \(days) 天", value: $days, in: 1...14)
@@ -192,7 +227,8 @@ private struct NewTripSheet: View {
                                     days: days,
                                     departure: hasDate ? departure : nil,
                                     scenes: PackingCopy.scenes.map(\.key).filter(scenes.contains),
-                                    weather: weather
+                                    weather: weather,
+                                    designContext: designContext
                                 )
                                 if let id {
                                     dismiss()

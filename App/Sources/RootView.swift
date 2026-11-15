@@ -45,6 +45,7 @@ struct MainTabView: View {
                         ToolLink(title: "出行打包", detail: "出门几天，从衣橱里带什么") { PackingListsView() }
                     }
                 }
+                .id(app.askNavigationID)
             }
             Tab("我的", systemImage: "person", value: .profile) {
                 NavigationStack { ProfileView() }

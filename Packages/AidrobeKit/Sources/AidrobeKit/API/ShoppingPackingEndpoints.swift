@@ -22,12 +22,15 @@ extension Endpoints {
     /// ignores a new `concern`.
     public static func decide(
         candidateID: String,
-        concern: Wire.DecisionRequest.ConcernPayload = .none
+        concern: Wire.DecisionRequest.ConcernPayload = .none,
+        designContext: Wire.DesignContextRef? = nil
     ) throws -> Endpoint<Wire.WardrobeDecisionResponse> {
-        try Endpoint(
+        var body = Wire.DecisionRequest(concern: concern)
+        body.designContext = designContext
+        return try Endpoint(
             .post,
             "/v1/purchase-candidates/\(candidateID)/decision",
-            json: Wire.DecisionRequest(concern: concern)
+            json: body
         )
     }
 

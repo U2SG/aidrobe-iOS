@@ -130,6 +130,9 @@ private struct TodayPage: View {
                     pieces
                     reasons
                     prep
+                    StylingExperienceView(outfitID: outfit.outfitId, refreshID: isWorn)
+                        .id(outfit.outfitId)
+                        .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
                 }
                 .padding(.horizontal, Spacing.screen)
                 .padding(.top, Spacing.row)

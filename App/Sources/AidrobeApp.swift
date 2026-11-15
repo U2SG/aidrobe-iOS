@@ -40,6 +40,8 @@ final class AppModel {
     private(set) var todayChange = UUID()
     var selectedTab: AppTab = .today
     var outfitToDiscuss: Wire.OutfitResponse?
+    var referenceToDiscuss: String?
+    private(set) var askNavigationID = UUID()
 
     var conversationBookmark: ConversationBookmark? {
         guard let accountID = ConversationBookmark.accountID(
@@ -56,8 +58,26 @@ final class AppModel {
     }
 
     func discussOutfit(_ outfit: Wire.OutfitResponse) {
+        referenceToDiscuss = nil
         outfitToDiscuss = outfit
         stylingChange = UUID()
+        askNavigationID = UUID()
+        selectedTab = .ask
+    }
+
+    func resumeDesign(_ conversationID: String) {
+        conversationBookmark?.save(conversationID)
+        outfitToDiscuss = nil
+        referenceToDiscuss = nil
+        askNavigationID = UUID()
+        selectedTab = .ask
+    }
+
+    func designFromReference(_ inspirationID: String) {
+        conversationBookmark?.save(nil)
+        outfitToDiscuss = nil
+        referenceToDiscuss = inspirationID
+        askNavigationID = UUID()
         selectedTab = .ask
     }
 
@@ -91,6 +111,8 @@ final class AppModel {
         wardrobe.reset()
         AccountLocalData.clear()
         outfitToDiscuss = nil
+        referenceToDiscuss = nil
+        askNavigationID = UUID()
         selectedTab = .today
         onboardingCompleted = false
     }

@@ -145,6 +145,10 @@ struct StyleInspirationView: View {
             if let raw = item.sourceUrl, let url = publicURL(raw) {
                 Link("打开来源", destination: url).font(.footnote)
             }
+            if item.designReferenceAvailable == true {
+                Button("照这个感觉搭") { app.designFromReference(item.id) }
+                    .buttonStyle(.glass)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {

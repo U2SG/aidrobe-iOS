@@ -43,6 +43,15 @@ struct PackingListDetailView: View {
                     days(list)
                 }
                 missing(list)
+                if let expected = model.expectedContext(for: listID),
+                   !DesignContinuity.matches(expected, list.designContext) {
+                    Text("这次结果没有带上原对话的条件，可以回去继续。")
+                        .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                }
+                if let conversationID = model.expectedContext(for: listID)?.conversationId ?? list.designContext?.conversationId {
+                    Button("回到这段对话") { app.resumeDesign(conversationID) }
+                        .buttonStyle(.glassProminent)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)
