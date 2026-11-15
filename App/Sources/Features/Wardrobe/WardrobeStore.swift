@@ -97,6 +97,10 @@ final class WardrobeStore {
         try await api.send(Endpoints.recognizeItem(id))
     }
 
+    func originalPhotoURL(_ id: String) async throws -> URL? {
+        Self.originalURL(try await api.send(Endpoints.wardrobeItem(id)))
+    }
+
     func requestProductImage(_ id: String) async throws {
         let generation = AccountLocalData.generation
         let item = try await api.send(Endpoints.generateItemProductImage(id))

@@ -189,7 +189,7 @@ private struct WardrobeTile: View {
 
     private var detail: String {
         if item.status != .wearable { return Garment.status(item.status) }
-        if item.cutoutStatus == "queued" { return "正在生成商品图…" }
+        if item.cutoutStatus == "queued" { return "正在生成单品图…" }
         let wears = item.wearCount ?? 0
         return wears == 0 ? Garment.color(item.colorMain) : "\(Garment.color(item.colorMain)) · 穿过 \(wears) 次"
     }

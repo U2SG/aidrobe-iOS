@@ -66,7 +66,7 @@ struct ShouldIBuyView: View {
                     Text("买之前，先问问衣橱")
                         .font(.display(30, weight: .black, relativeTo: .largeTitle))
                         .foregroundStyle(Color.label)
-                    Text("给一张商品图或截图，看看衣橱里有没有能替它的，它又能和什么搭。结论只是参考，买不买你说了算。")
+                    Text("给一张衣物照片或截图，看看衣橱里有没有能替它的，它又能和什么搭。结论只是参考，买不买你说了算。")
                         .font(.body)
                         .foregroundStyle(Color.secondaryLabel)
                 }
