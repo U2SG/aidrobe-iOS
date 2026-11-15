@@ -36,6 +36,30 @@ final class AppModel {
     }
 
     private(set) var sessionNotice: String?
+    private(set) var stylingChange = UUID()
+    private(set) var todayChange = UUID()
+    var selectedTab: AppTab = .today
+    var outfitToDiscuss: Wire.OutfitResponse?
+
+    var conversationBookmark: ConversationBookmark? {
+        guard let accountID = ConversationBookmark.accountID(
+            accessToken: tokens.tokens?.accessToken,
+            developmentUserID: environment.allowsDevLogin ? environment.devUserID : nil
+        ) else { return nil }
+        return ConversationBookmark(accountID: accountID, server: environment.apiBaseURL)
+    }
+
+    func stylingDidChange(_ styling: Wire.StylingResponse) {
+        conversationBookmark?.save(styling.conversationId)
+        stylingChange = UUID()
+        if styling.status == .adopted { todayChange = UUID() }
+    }
+
+    func discussOutfit(_ outfit: Wire.OutfitResponse) {
+        outfitToDiscuss = outfit
+        stylingChange = UUID()
+        selectedTab = .ask
+    }
 
     private static let onboardingKey = "aidrobe.onboarding.completed"
 
@@ -47,7 +71,11 @@ final class AppModel {
 
         let relay = SessionRelay()
         self.api = APIClient(environment: environment, tokens: tokens) { event in
-            Task { @MainActor in relay.model?.handle(event) }
+            let generation = tokens.generation
+            Task { @MainActor in
+                guard tokens.generation == generation, tokens.tokens == nil else { return }
+                relay.model?.handle(event)
+            }
         }
         self.wardrobe = WardrobeStore(api: api)
         relay.model = self
@@ -62,6 +90,8 @@ final class AppModel {
         tokens.clear()
         wardrobe.reset()
         AccountLocalData.clear()
+        outfitToDiscuss = nil
+        selectedTab = .today
         onboardingCompleted = false
     }
 

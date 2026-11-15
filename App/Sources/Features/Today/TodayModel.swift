@@ -1,8 +1,7 @@
 import AidrobeKit
 import Foundation
 
-/// One garment as the board shows it. `slotID` is the item the recommendation
-/// chose; `itemID` differs once the user swaps the piece for another.
+/// One garment in a persisted outfit version.
 struct BoardItem: Identifiable, Equatable {
     let slotID: String
     let itemID: String
@@ -12,7 +11,6 @@ struct BoardItem: Identifiable, Equatable {
     var usesGeneratedCover: Bool = false
 
     var id: String { slotID }
-    var isSwapped: Bool { slotID != itemID }
 }
 
 /// A situation the user can tell Today about; the backend maps each to fixed
@@ -50,20 +48,27 @@ final class TodayModel {
     private(set) var appliedChip: ContextChip?
     private(set) var appliedText: String?
     private(set) var isRefreshing = false
+    private(set) var isRevising = false
+    private(set) var needsLatestVersion = false
+    private(set) var revisedOutfitID: String?
     private(set) var generatedImages: [String: URL] = [:]
     private(set) var generatingOutfits: Set<String> = []
     private(set) var outfitImageIssues: [String: String] = [:]
-    /// outfit id → recommended item id → the item the user chose instead.
-    private var swaps: [String: [String: String]] = [:]
     var notice: String?
 
     private let api: APIClient
     private let wardrobe: WardrobeStore
     private let wornLedger = WornLedger()
+    private let accountGeneration = AccountLocalData.generation
+    private let onRevision: (Wire.StylingResponse) -> Void
+    private var loadID = UUID()
+    private var mutationID = UUID()
+    private var actionRecommendationDate: String?
 
-    init(api: APIClient, wardrobe: WardrobeStore) {
+    init(api: APIClient, wardrobe: WardrobeStore, onRevision: @escaping (Wire.StylingResponse) -> Void = { _ in }) {
         self.api = api
         self.wardrobe = wardrobe
+        self.onRevision = onRevision
     }
 
     var outfits: [Wire.OutfitResponse] { today?.outfits ?? [] }
@@ -109,15 +114,23 @@ final class TodayModel {
     }
 
     func load() async {
+        guard !isRefreshing, !isRevising, accountGeneration == AccountLocalData.generation else { return }
+        let requestID = UUID()
+        loadID = requestID
+        let mutation = mutationID
         if today == nil { phase = .loading }
         do {
             async let todayRequest = api.send(Endpoints.today())
             async let wardrobeLoad: Void = wardrobe.load()
             let (today, _) = try await (todayRequest, wardrobeLoad)
+            guard loadID == requestID, mutationID == mutation, accountGeneration == AccountLocalData.generation else { return }
             apply(today)
             phase = .loaded
         } catch {
+            guard loadID == requestID, mutationID == mutation, accountGeneration == AccountLocalData.generation else { return }
+            if Task.isCancelled { return }
             if today == nil { phase = .failed(userMessage(for: error)) }
+            else if needsLatestVersion { notice = "没能读取最新搭配，请再试一次。已保存的版本仍然保留。" }
         }
         if feedbackTags.isEmpty {
             feedbackTags = (try? await api.send(Endpoints.feedbackTags()).tags) ?? []
@@ -126,13 +139,16 @@ final class TodayModel {
 
     /// Asks for a fresh set, optionally for a stated situation.
     func refresh(chip: ContextChip? = nil, text: String? = nil) async throws {
+        guard !isRefreshing, !isRevising else { return }
+        let mutation = UUID()
+        mutationID = mutation
         isRefreshing = true
         defer { isRefreshing = false }
         let result = try await api.send(Endpoints.refreshToday(chipID: chip?.id, text: text))
+        guard mutationID == mutation, accountGeneration == AccountLocalData.generation else { return }
         apply(result)
         appliedChip = result.appliedContext == nil ? nil : chip
         appliedText = chip == nil ? result.appliedContext?.overrideText : nil
-        swaps = [:]
     }
 
     static func refreshMessage(_ error: any Error) -> String {
@@ -145,8 +161,23 @@ final class TodayModel {
 
     private func apply(_ today: Wire.TodayRecommendationResponse) {
         self.today = today
+        needsLatestVersion = false
         wornOutfitIDs = wornLedger.outfits(on: today.recommendationDate)
         favoriteOutfitIDs = Set(today.outfits?.filter { $0.isFavorited == true }.map(\.outfitId) ?? [])
+    }
+
+    /// Ask reuses the same outfit actions without manufacturing a Today response.
+    func syncOutfit(_ outfit: Wire.OutfitResponse, recommendationDate: String? = nil) {
+        if outfit.isFavorited == true { favoriteOutfitIDs.insert(outfit.outfitId) }
+        else { favoriteOutfitIDs.remove(outfit.outfitId) }
+        actionRecommendationDate = recommendationDate
+        if let recommendationDate { wornOutfitIDs = wornLedger.outfits(on: recommendationDate) }
+        needsLatestVersion = false
+    }
+
+    func reloadAfterConflict() async -> Bool {
+        await load()
+        return !needsLatestVersion
     }
 
     // MARK: Board
@@ -154,7 +185,7 @@ final class TodayModel {
     func boardItems(for outfit: Wire.OutfitResponse) -> [BoardItem] {
         let order = ["outerwear", "top", "dress", "bottom", "shoes"]
         return outfit.items.map { slot -> BoardItem in
-            let itemID = swaps[outfit.outfitId]?[slot.itemId] ?? slot.itemId
+            let itemID = slot.itemId
             let item = wardrobe.item(itemID)
             let individualImage = item?.coverImageUrl.flatMap { cover in
                 item?.cutoutStatus == "ready" || cover != item?.originalImageUrl ? URL(string: cover) : nil
@@ -213,6 +244,7 @@ final class TodayModel {
         let clock = ContinuousClock()
         let deadline = clock.now.advanced(by: .seconds(230))
         while clock.now < deadline {
+            guard !Task.isCancelled, accountGeneration == AccountLocalData.generation else { throw CancellationError() }
             switch asset.generationStatus {
             case "completed":
                 if let image = asset.imageUrl.flatMap(URL.init(string:)) {
@@ -241,26 +273,49 @@ final class TodayModel {
             .filter { $0.itemId != slot.itemID }
     }
 
-    /// Swaps are local to today's page; `itemID == nil` restores the original.
-    func swap(_ slot: BoardItem, to itemID: String?, in outfit: Wire.OutfitResponse) {
-        swaps[outfit.outfitId, default: [:]][slot.slotID] = itemID
+    /// The server creates a complete new outfit version, including its Today
+    /// association. No local replacement can get ahead of that saved result.
+    func swap(
+        _ slot: BoardItem, to itemID: String, in outfit: Wire.OutfitResponse, requestID: String
+    ) async throws -> Wire.StylingResponse {
+        guard !isRevising, !isRefreshing, !needsLatestVersion else { throw CancellationError() }
+        let mutation = UUID()
+        mutationID = mutation
+        isRevising = true
+        defer { isRevising = false }
+        let revised: Wire.StylingResponse
+        do {
+            revised = try await api.send(Endpoints.reviseOutfit(
+                outfitID: outfit.outfitId, itemID: slot.itemID, replacementItemID: itemID, requestID: requestID
+            ))
+        } catch {
+            if accountGeneration == AccountLocalData.generation, (error as? APIError)?.status == 409 {
+                needsLatestVersion = true
+            }
+            throw error
+        }
+        guard mutationID == mutation, accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        if revised.status == .adopted, var current = today {
+            current.outfits = [revised.outfit]
+            current.recommendationId = revised.recommendationId
+            current.revision = revised.recommendationRevision
+            if let day = revised.recommendationDate { current.recommendationDate = day }
+            apply(current)
+        }
+        syncOutfit(revised.outfit, recommendationDate: revised.recommendationDate)
+        revisedOutfitID = revised.outfit.outfitId
+        onRevision(revised)
+        return revised
     }
 
     // MARK: Actions
 
     func markWorn(_ outfit: Wire.OutfitResponse) async {
-        let accountGeneration = AccountLocalData.generation
         do {
             _ = try await api.send(Endpoints.markWorn(outfitID: outfit.outfitId))
-            // The outfit record knows only the recommended pieces; pieces the
-            // user swapped in get their own wear record.
-            for item in boardItems(for: outfit) where item.isSwapped {
-                guard accountGeneration == AccountLocalData.generation else { return }
-                try? await wardrobe.markWorn(item.itemID)
-            }
             guard accountGeneration == AccountLocalData.generation else { return }
             wornOutfitIDs.insert(outfit.outfitId)
-            if let day = today?.recommendationDate { wornLedger.record(outfit.outfitId, on: day) }
+            if let day = today?.recommendationDate ?? actionRecommendationDate { wornLedger.record(outfit.outfitId, on: day) }
             await wardrobe.load()
         } catch {
             notice = userMessage(for: error)
@@ -271,6 +326,7 @@ final class TodayModel {
         let favorite = !favoriteOutfitIDs.contains(outfit.outfitId)
         do {
             _ = try await api.send(Endpoints.setFavorite(favorite, outfitID: outfit.outfitId))
+            guard accountGeneration == AccountLocalData.generation else { return }
             if favorite { favoriteOutfitIDs.insert(outfit.outfitId) } else { favoriteOutfitIDs.remove(outfit.outfitId) }
         } catch {
             notice = userMessage(for: error)
@@ -280,6 +336,7 @@ final class TodayModel {
     func sendFeedback(_ kind: FeedbackKind, tags: [String], for outfit: Wire.OutfitResponse) async -> Bool {
         do {
             _ = try await api.send(Endpoints.feedback(outfitID: outfit.outfitId, type: kind, reasonTags: tags))
+            guard accountGeneration == AccountLocalData.generation else { return false }
             feedbackByOutfit[outfit.outfitId] = kind
             notice = "记下了，下次搭配会参考"
             return true

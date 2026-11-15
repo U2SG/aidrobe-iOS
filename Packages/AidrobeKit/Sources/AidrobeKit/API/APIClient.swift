@@ -33,11 +33,17 @@ public enum SessionEvent: Sendable, Equatable {
 /// - On 401 (non-auth endpoints, token sessions only) runs one shared refresh and
 ///   replays the request once.
 public actor APIClient {
+    private struct RefreshFlight {
+        let id = UUID()
+        let session: TokenStore.Snapshot
+        let task: Task<TokenPair, any Error>
+    }
+
     private let environment: AppEnvironment
     private let tokens: TokenStore
     private let transport: any HTTPTransport
     private let onSessionEvent: @Sendable (SessionEvent) -> Void
-    private var refreshTask: Task<TokenPair, any Error>?
+    private var refreshTask: RefreshFlight?
 
     /// `X-Correlation-Id` for the active V3 decision flow, if any.
     public var correlationID: String?
@@ -59,30 +65,36 @@ public actor APIClient {
     }
 
     public func send<Response>(_ endpoint: Endpoint<Response>) async throws -> Response {
-        let session = tokens.tokens
-        let (data, response) = try await perform(endpoint, accessToken: session?.accessToken)
+        let session = tokens.snapshot
+        let (data, response) = try await perform(endpoint, accessToken: session.tokens?.accessToken)
+        try requireSession(session)
 
         if response.statusCode == 401 {
             let message = Self.errorFields(in: data).message ?? ""
             if message.localizedCaseInsensitiveContains("deactivated") {
-                tokens.clear()
-                onSessionEvent(.deactivated)
+                try expireSession(.deactivated, ifCurrent: session)
                 throw APIError.unauthorized(deactivated: true)
             }
-            guard !endpoint.isAuthEndpoint, let session else {
-                if session != nil { expireSession() }
+            guard !endpoint.isAuthEndpoint, session.tokens != nil else {
+                if session.tokens != nil { try expireSession(.expired, ifCurrent: session) }
                 throw APIError.unauthorized(deactivated: false)
             }
-            let refreshed: TokenPair
+            let refreshed: TokenStore.Snapshot
             do {
                 refreshed = try await refreshTokens(from: session)
+            } catch is CancellationError {
+                throw CancellationError()
             } catch {
-                expireSession()
+                try requireSession(session)
+                try expireSession(.expired, ifCurrent: session)
                 throw APIError.unauthorized(deactivated: false)
             }
-            let (retryData, retryResponse) = try await perform(endpoint, accessToken: refreshed.accessToken)
+            try requireSession(refreshed)
+            guard let accessToken = refreshed.tokens?.accessToken else { throw CancellationError() }
+            let (retryData, retryResponse) = try await perform(endpoint, accessToken: accessToken)
+            try requireSession(refreshed)
             if retryResponse.statusCode == 401 {
-                expireSession()
+                try expireSession(.expired, ifCurrent: refreshed)
                 throw APIError.unauthorized(deactivated: false)
             }
             return try Self.decode(Response.self, data: retryData, response: retryResponse)
@@ -131,26 +143,48 @@ public actor APIClient {
 
     // MARK: - Refresh
 
-    private func refreshTokens(from session: TokenPair) async throws -> TokenPair {
-        if let refreshTask { return try await refreshTask.value }
-        guard let refreshToken = session.refreshToken else { throw APIError.unauthorized(deactivated: false) }
+    private func refreshTokens(from session: TokenStore.Snapshot) async throws -> TokenStore.Snapshot {
+        try requireSession(session)
+        let current = tokens.snapshot
+        guard current.generation == session.generation else { throw CancellationError() }
+        // Another request may already have refreshed this account while its
+        // old 401 was in flight. Reuse those tokens without rotating again.
+        if current.tokens != session.tokens { return current }
 
-        let task = Task<TokenPair, any Error> {
-            let endpoint = try Endpoint<AuthTokens>(.post, "/v1/auth/refresh", json: Wire.RefreshTokenRequest(refreshToken: refreshToken))
-            let (data, response) = try await perform(endpoint, accessToken: nil)
-            let tokens = try Self.decode(AuthTokens.self, data: data, response: response)
-            return TokenPair(accessToken: tokens.accessToken, refreshToken: tokens.refreshToken)
+        let flight: RefreshFlight
+        if let refreshTask, refreshTask.session == session {
+            flight = refreshTask
+        } else {
+            guard let refreshToken = session.tokens?.refreshToken else { throw APIError.unauthorized(deactivated: false) }
+            let task = Task<TokenPair, any Error> {
+                let endpoint = try Endpoint<AuthTokens>(.post, "/v1/auth/refresh", json: Wire.RefreshTokenRequest(refreshToken: refreshToken))
+                let (data, response) = try await perform(endpoint, accessToken: nil)
+                let tokens = try Self.decode(AuthTokens.self, data: data, response: response)
+                return TokenPair(accessToken: tokens.accessToken, refreshToken: tokens.refreshToken)
+            }
+            flight = RefreshFlight(session: session, task: task)
+            refreshTask = flight
         }
-        refreshTask = task
-        defer { refreshTask = nil }
-        let pair = try await task.value
-        tokens.save(pair)
-        return pair
+        defer { if refreshTask?.id == flight.id { refreshTask = nil } }
+        let pair = try await flight.task.value
+        // The refresh outlives any individual waiter. Persist its rotated
+        // credentials even if that caller was cancelled while waiting.
+        // Account changes still invalidate the old generation.
+        guard tokens.generation == session.generation else { throw CancellationError() }
+        if let updated = tokens.rotate(pair, ifCurrent: session) { return updated }
+        // A waiter on this same refresh may have stored the pair already.
+        let updated = tokens.snapshot
+        guard updated.generation == session.generation else { throw CancellationError() }
+        return updated
     }
 
-    private func expireSession() {
-        tokens.clear()
-        onSessionEvent(.expired)
+    private func requireSession(_ expected: TokenStore.Snapshot) throws {
+        guard !Task.isCancelled, tokens.generation == expected.generation else { throw CancellationError() }
+    }
+
+    private func expireSession(_ event: SessionEvent, ifCurrent expected: TokenStore.Snapshot) throws {
+        guard tokens.clear(ifCurrent: expected) else { throw CancellationError() }
+        onSessionEvent(event)
     }
 
     // MARK: - Decoding

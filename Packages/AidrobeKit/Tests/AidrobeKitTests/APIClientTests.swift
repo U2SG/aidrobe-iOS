@@ -29,6 +29,24 @@ final class EventRecorder: @unchecked Sendable {
     func record(_ event: SessionEvent) { lock.withLock { _events.append(event) } }
 }
 
+/// Deterministic ordering for account switches while a response is in flight.
+private actor ResponseGate {
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func wait() async {
+        if isOpen { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+
+    func open() {
+        isOpen = true
+        let pending = waiters
+        waiters = []
+        for waiter in pending { waiter.resume() }
+    }
+}
+
 struct Item: Decodable, Sendable, Equatable {
     var itemId: String
     enum CodingKeys: String, CodingKey { case itemId = "item_id" }
@@ -137,6 +155,40 @@ private func makeClient(
         #expect(transport.requests.map { $0.url!.path() } == ["/v1/x", "/v1/auth/refresh", "/v1/x"])
     }
 
+    @Test func cancelledWaiterStillPersistsRotatedCredentials() async throws {
+        let refreshArrived = ResponseGate()
+        let releaseRefresh = ResponseGate()
+        let events = EventRecorder()
+        let (client, transport, store) = makeClient(
+            tokens: TokenPair(accessToken: "A1", refreshToken: "R1"), events: events
+        ) { request in
+            if request.url?.path() == "/v1/auth/refresh" {
+                await refreshArrived.open()
+                await releaseRefresh.wait()
+                return (200, Self.tokensBody)
+            }
+            return request.value(forHTTPHeaderField: "Authorization") == "Bearer A2"
+                ? (200, #"{"item_id":"ok"}"#)
+                : (401, #"{"message":"expired"}"#)
+        }
+        let generation = store.generation
+        let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/x")) }
+        await refreshArrived.wait()
+        pending.cancel()
+        await releaseRefresh.open()
+
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        #expect(store.tokens == TokenPair(accessToken: "A2", refreshToken: "R2"))
+        #expect(store.generation == generation)
+        #expect(events.events.isEmpty)
+        #expect(transport.requests.map { $0.url!.path() } == ["/v1/x", "/v1/auth/refresh"])
+
+        let next = try await client.send(Endpoint<Item>(.get, "/v1/x"))
+        #expect(next.itemId == "ok")
+        #expect(transport.requests.last?.value(forHTTPHeaderField: "Authorization") == "Bearer A2")
+        #expect(transport.requests.filter { $0.url!.path() == "/v1/auth/refresh" }.count == 1)
+    }
+
     @Test func concurrentRequestsShareOneRefresh() async throws {
         let (client, transport, _) = makeClient(tokens: TokenPair(accessToken: "A1", refreshToken: "R1")) { request in
             if request.url?.path() == "/v1/auth/refresh" {
@@ -194,6 +246,136 @@ private func makeClient(
             try await client.send(Endpoint<Item>(.get, "/v1/x"))
         }
         #expect(transport.requests.count == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func oldUnauthorizedResponseCannotExpireNewAccount(deactivated: Bool) async throws {
+        let arrived = ResponseGate()
+        let release = ResponseGate()
+        let events = EventRecorder()
+        let (client, transport, store) = makeClient(
+            tokens: TokenPair(accessToken: "A1", refreshToken: "R1"), events: events
+        ) { _ in
+            await arrived.open()
+            await release.wait()
+            return (401, deactivated
+                ? #"{"code":4001,"message":"Account deactivated","data":null}"#
+                : #"{"code":4001,"message":"Token expired","data":null}"#)
+        }
+        let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/old-account")) }
+        await arrived.wait()
+        store.clear()
+        let next = TokenPair(accessToken: "B1", refreshToken: "BR1")
+        store.save(next)
+        await release.open()
+
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        #expect(store.tokens == next)
+        #expect(events.events.isEmpty)
+        #expect(transport.requests.count == 1)
+    }
+
+    @Test(arguments: [false, true])
+    func oldRefreshCannotOverwriteOrExpireNewAccount(succeeds: Bool) async throws {
+        let arrived = ResponseGate()
+        let release = ResponseGate()
+        let events = EventRecorder()
+        let (client, transport, store) = makeClient(
+            tokens: TokenPair(accessToken: "A1", refreshToken: "R1"), events: events
+        ) { request in
+            if request.url?.path() == "/v1/auth/refresh" {
+                let body = try JSONSerialization.jsonObject(with: request.httpBody ?? Data()) as? [String: Any]
+                if body?["refresh_token"] as? String == "BR1" {
+                    return (200, #"{"user_id":"b","access_token":"B2","refresh_token":"BR2","token_type":"bearer","expires_in":3600}"#)
+                }
+                await arrived.open()
+                await release.wait()
+                return succeeds ? (200, Self.tokensBody) : (401, #"{"message":"expired"}"#)
+            }
+            if request.value(forHTTPHeaderField: "Authorization") == "Bearer B2" {
+                return (200, #"{"item_id":"new-account"}"#)
+            }
+            return (401, #"{"message":"expired"}"#)
+        }
+        let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/old-account")) }
+        await arrived.wait()
+        store.clear()
+        let next = TokenPair(accessToken: "B1", refreshToken: "BR1")
+        store.save(next)
+        // A broken cross-account single-flight should fail rather than hang
+        // waiting forever on the old account's deliberately held response.
+        let fallbackRelease = Task {
+            try? await Task.sleep(for: .milliseconds(100))
+            await release.open()
+        }
+        defer { fallbackRelease.cancel() }
+        let current = try await client.send(Endpoint<Item>(.get, "/v1/new-account"))
+        await release.open()
+        fallbackRelease.cancel()
+        await fallbackRelease.value
+
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        #expect(current.itemId == "new-account")
+        #expect(store.tokens == TokenPair(accessToken: "B2", refreshToken: "BR2"))
+        #expect(events.events.isEmpty)
+        #expect(transport.requests.map { $0.url!.path() } == [
+            "/v1/old-account", "/v1/auth/refresh", "/v1/new-account", "/v1/auth/refresh", "/v1/new-account",
+        ])
+    }
+
+    @Test func oldSuccessIsDiscardedAfterLogout() async throws {
+        let arrived = ResponseGate()
+        let release = ResponseGate()
+        let (client, _, store) = makeClient(tokens: TokenPair(accessToken: "A1", refreshToken: "R1")) { _ in
+            await arrived.open()
+            await release.wait()
+            return (200, #"{"item_id":"private-old-account-data"}"#)
+        }
+        let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/wardrobe")) }
+        await arrived.wait()
+        store.clear()
+        await release.open()
+
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        #expect(store.tokens == nil)
+    }
+
+    @Test func late401ReusesAlreadyRefreshedTokensWithinTheSameSession() async throws {
+        let arrived = ResponseGate()
+        let release = ResponseGate()
+        let (client, transport, _) = makeClient(tokens: TokenPair(accessToken: "A1", refreshToken: "R1")) { request in
+            if request.url?.path() == "/v1/auth/refresh" { return (200, Self.tokensBody) }
+            if request.value(forHTTPHeaderField: "Authorization") == "Bearer A2" {
+                return (200, #"{"item_id":"ok"}"#)
+            }
+            if request.url?.path() == "/v1/slow" {
+                await arrived.open()
+                await release.wait()
+            }
+            return (401, #"{"message":"expired"}"#)
+        }
+        let delayed = Task { try await client.send(Endpoint<Item>(.get, "/v1/slow")) }
+        await arrived.wait()
+        _ = try await client.send(Endpoint<Item>(.get, "/v1/fast"))
+        await release.open()
+        let result = try await delayed.value
+
+        #expect(result.itemId == "ok")
+        #expect(transport.requests.filter { $0.url?.path() == "/v1/auth/refresh" }.count == 1)
+    }
+
+    @Test func oldTokenSnapshotCannotChangeAReplacementLoginEvenWithIdenticalTokens() {
+        let store = TokenStore(store: InMemorySecureStore())
+        let original = TokenPair(accessToken: "A1", refreshToken: "R1")
+        store.save(original)
+        let oldSession = store.snapshot
+        store.clear()
+        store.save(original)
+
+        #expect(store.rotate(TokenPair(accessToken: "A2", refreshToken: "R2"), ifCurrent: oldSession) == nil)
+        #expect(!store.clear(ifCurrent: oldSession))
+        #expect(store.tokens == original)
+        #expect(store.generation != oldSession.generation)
     }
 }
 

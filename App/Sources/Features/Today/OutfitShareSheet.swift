@@ -1,7 +1,7 @@
 import SwiftUI
 import UIKit
 
-/// Capture the pieces at the tap, including any local swaps. Do not put private
+/// Capture the persisted outfit version at the tap. Do not put private
 /// locations, feedback, or recommendation reasons into an exported image.
 struct OutfitShareDraft: Identifiable {
     let id = UUID()

@@ -6,10 +6,16 @@ struct SwapSheet: View {
     let outfit: Wire.OutfitResponse
     let slot: BoardItem
     let model: TodayModel
+    var onRevision: ((Wire.StylingResponse) -> Void)?
+    var onConflict: (() async -> Bool)?
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var candidates: [Wire.ReplacementCandidateResponse]?
     @State private var failure: String?
+    @State private var isSaving = false
+    @State private var needsReload = false
+    @State private var pendingItemID: String?
+    @State private var requestID = UUID().uuidString
 
     private let columns = Array(repeating: GridItem(.flexible(), spacing: Spacing.control), count: 3)
 
@@ -24,13 +30,6 @@ struct SwapSheet: View {
                         .font(.subheadline)
                         .foregroundStyle(Color.secondaryLabel)
                 }
-                if slot.isSwapped {
-                    Button("换回推荐的那件") {
-                        model.swap(slot, to: nil, in: outfit)
-                        dismiss()
-                    }
-                    .buttonStyle(.glass)
-                }
                 if let candidates {
                     if candidates.isEmpty {
                         Text("衣橱里暂时没有能替换的\(Garment.category(slot.role))。")
@@ -41,8 +40,7 @@ struct SwapSheet: View {
                         LazyVGrid(columns: columns, alignment: .leading, spacing: Spacing.row) {
                             ForEach(candidates, id: \.itemId) { candidate in
                                 Button {
-                                    model.swap(slot, to: candidate.itemId, in: outfit)
-                                    dismiss()
+                                    Task { await save(candidate.itemId) }
                                 } label: {
                                     VStack(alignment: .leading, spacing: 6) {
                                         GarmentImage(url: app.wardrobe.imageURL(candidate.itemId))
@@ -55,15 +53,41 @@ struct SwapSheet: View {
                                     }
                                 }
                                 .buttonStyle(.plain)
+                                .disabled(isSaving || needsReload)
                             }
                         }
                     }
-                } else if let failure {
-                    Text(failure)
-                        .font(.body)
-                        .foregroundStyle(Color.secondaryLabel)
-                } else {
+                } else if failure == nil {
                     ProgressView().frame(maxWidth: .infinity).padding(.top, Spacing.section)
+                }
+                if isSaving { ProgressView("正在保存这套搭配…") }
+                if let failure {
+                    Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                    if needsReload {
+                        Button("查看最新搭配") {
+                            Task {
+                                guard !isSaving else { return }
+                                isSaving = true
+                                let recovered: Bool
+                                if let onConflict { recovered = await onConflict() }
+                                else { recovered = await model.reloadAfterConflict() }
+                                isSaving = false
+                                if recovered { dismiss() }
+                                else { self.failure = "没能读取最新搭配，请再试一次。" }
+                            }
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(isSaving)
+                    } else {
+                        Button("再试一次") {
+                            Task {
+                                if let pendingItemID { await save(pendingItemID) }
+                                else { await load() }
+                            }
+                        }
+                        .buttonStyle(.glass)
+                        .disabled(isSaving)
+                    }
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -72,12 +96,33 @@ struct SwapSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationBackground(Color.background)
-        .task {
-            do {
-                candidates = try await model.replacements(for: slot, in: outfit)
-            } catch {
-                failure = userMessage(for: error)
-            }
+        .interactiveDismissDisabled(isSaving)
+        .task { await load() }
+    }
+
+    private func load() async {
+        failure = nil
+        do { candidates = try await model.replacements(for: slot, in: outfit) }
+        catch { failure = userMessage(for: error) }
+    }
+
+    private func save(_ itemID: String) async {
+        guard !isSaving, !needsReload else { return }
+        // A retry must keep the exact operation id after a lost response.
+        if pendingItemID != itemID { requestID = UUID().uuidString }
+        pendingItemID = itemID
+        isSaving = true
+        failure = nil
+        defer { isSaving = false }
+        do {
+            let result = try await model.swap(slot, to: itemID, in: outfit, requestID: requestID)
+            onRevision?(result)
+            dismiss()
+        } catch is CancellationError {
+            return
+        } catch {
+            needsReload = (error as? APIError)?.status == 409
+            failure = needsReload ? "这套已经有新修改，请先看最新版本。" : userMessage(for: error)
         }
     }
 }

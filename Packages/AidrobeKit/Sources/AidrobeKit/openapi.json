@@ -1916,6 +1916,77 @@
     }
    }
   },
+  "/v1/recommendations/outfits/{outfit_id}/revisions": {
+   "post": {
+    "tags": [
+     "recommendations"
+    ],
+    "summary": "Revise Outfit",
+    "operationId": "revise_outfit_v1_recommendations_outfits__outfit_id__revisions_post",
+    "parameters": [
+     {
+      "name": "outfit_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Outfit Id"
+      }
+     },
+     {
+      "name": "Authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "Authorization"
+      }
+     },
+     {
+      "name": "X-User-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "X-User-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/ReviseOutfitRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StylingResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/recommendations/outfits/{outfit_id}/items/{item_id}/replacements": {
    "get": {
     "tags": [
@@ -6283,6 +6354,209 @@
     }
    }
   },
+  "/v1/ask/conversations/{conversation_id}": {
+   "get": {
+    "tags": [
+     "ask"
+    ],
+    "summary": "Get Conversation",
+    "operationId": "get_conversation_v1_ask_conversations__conversation_id__get",
+    "parameters": [
+     {
+      "name": "conversation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Conversation Id"
+      }
+     },
+     {
+      "name": "Authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "Authorization"
+      }
+     },
+     {
+      "name": "X-User-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "X-User-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/AskConversationResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ask/conversations/{conversation_id}/outfit-revisions": {
+   "post": {
+    "tags": [
+     "ask"
+    ],
+    "summary": "Create Outfit Revision",
+    "operationId": "create_outfit_revision_v1_ask_conversations__conversation_id__outfit_revisions_post",
+    "parameters": [
+     {
+      "name": "conversation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Conversation Id"
+      }
+     },
+     {
+      "name": "Authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "Authorization"
+      }
+     },
+     {
+      "name": "X-User-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "X-User-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/CreateOutfitRevisionRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StylingResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/v1/ask/conversations/{conversation_id}/adopt": {
+   "post": {
+    "tags": [
+     "ask"
+    ],
+    "summary": "Adopt Styling",
+    "operationId": "adopt_styling_v1_ask_conversations__conversation_id__adopt_post",
+    "parameters": [
+     {
+      "name": "conversation_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Conversation Id"
+      }
+     },
+     {
+      "name": "Authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "Authorization"
+      }
+     },
+     {
+      "name": "X-User-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "X-User-Id"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/AdoptStylingRequest"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/StylingResponse"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/ask/{ask_session_id}/feedback": {
    "post": {
     "tags": [
@@ -6492,6 +6766,31 @@
     ],
     "title": "AdminAsyncJobListResponse"
    },
+   "AdoptStylingRequest": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "expected_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Expected Revision"
+     },
+     "date": {
+      "type": "string",
+      "format": "date",
+      "title": "Date"
+     }
+    },
+    "type": "object",
+    "required": [
+     "request_id",
+     "expected_revision"
+    ],
+    "title": "AdoptStylingRequest"
+   },
    "AppleLoginRequest": {
     "properties": {
      "id_token": {
@@ -6560,12 +6859,107 @@
     "type": "object",
     "title": "AskConversationDeltas"
    },
+   "AskConversationMessage": {
+    "properties": {
+     "id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Id"
+     },
+     "ask_session_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Ask Session Id"
+     },
+     "role": {
+      "type": "string",
+      "title": "Role"
+     },
+     "content": {
+      "type": "string",
+      "title": "Content"
+     },
+     "created_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Created At"
+     },
+     "styling": {
+      "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
+     },
+     "item_refs": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "title": "Item Refs"
+     },
+     "item_ref_snapshots": {
+      "items": {
+       "$ref": "#/components/schemas/AskItemRefSnapshot"
+      },
+      "type": "array",
+      "title": "Item Ref Snapshots"
+     },
+     "trip_intent": {
+      "$ref": "#/components/schemas/AskTripIntent"
+     }
+    },
+    "type": "object",
+    "required": [
+     "id",
+     "role",
+     "content",
+     "created_at"
+    ],
+    "title": "AskConversationMessage"
+   },
+   "AskConversationResponse": {
+    "properties": {
+     "conversation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Conversation Id"
+     },
+     "title": {
+      "type": "string",
+      "title": "Title"
+     },
+     "styling": {
+      "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
+     },
+     "messages": {
+      "items": {
+       "$ref": "#/components/schemas/AskConversationMessage"
+      },
+      "type": "array",
+      "title": "Messages"
+     }
+    },
+    "type": "object",
+    "required": [
+     "conversation_id"
+    ],
+    "title": "AskConversationResponse"
+   },
    "AskHistoryItem": {
     "properties": {
      "ask_session_id": {
       "type": "string",
       "format": "uuid",
       "title": "Ask Session Id"
+     },
+     "styling": {
+      "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
      },
      "conversation_id": {
       "type": "string",
@@ -6670,6 +7064,29 @@
       "type": "string",
       "format": "uuid",
       "title": "Conversation Id"
+     },
+     "design_mode": {
+      "type": "boolean",
+      "title": "Design Mode",
+      "default": false
+     },
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "expected_revision": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Expected Revision"
+     },
+     "base_outfit_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Base Outfit Id"
+     },
+     "constraints": {
+      "$ref": "#/components/schemas/StylingConstraints"
      }
     },
     "type": "object",
@@ -6684,6 +7101,12 @@
       "type": "string",
       "format": "uuid",
       "title": "Ask Session Id"
+     },
+     "styling": {
+      "$ref": "#/components/schemas/StylingResponse"
+     },
+     "design_brief": {
+      "$ref": "#/components/schemas/DesignBrief"
      },
      "conversation_id": {
       "type": "string",
@@ -7773,6 +8196,47 @@
     ],
     "title": "CreateOutfitPlanRequest"
    },
+   "CreateOutfitRevisionRequest": {
+    "properties": {
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     },
+     "expected_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Expected Revision"
+     },
+     "replace": {
+      "$ref": "#/components/schemas/OutfitItemReplacementRequest"
+     },
+     "locked_item_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Locked Item Ids"
+     },
+     "excluded_item_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Excluded Item Ids"
+     }
+    },
+    "type": "object",
+    "required": [
+     "request_id",
+     "expected_revision"
+    ],
+    "title": "CreateOutfitRevisionRequest"
+   },
    "CreatePackingListRequest": {
     "properties": {
      "destination": {
@@ -7973,6 +8437,29 @@
      "deleted"
     ],
     "title": "DeleteWardrobeItemResponse"
+   },
+   "DesignBrief": {
+    "properties": {
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "constraints": {
+      "$ref": "#/components/schemas/StylingConstraints"
+     },
+     "needs_outfit_update": {
+      "type": "boolean",
+      "title": "Needs Outfit Update"
+     }
+    },
+    "type": "object",
+    "required": [
+     "revision",
+     "constraints",
+     "needs_outfit_update"
+    ],
+    "title": "DesignBrief",
+    "description": "Current accepted conditions, including turns without a complete outfit."
    },
    "FavoriteOutfitResponse": {
     "properties": {
@@ -8681,6 +9168,23 @@
      "created_at": {
       "type": "string",
       "title": "Created At"
+     },
+     "scope": {
+      "additionalProperties": {
+       "type": "string"
+      },
+      "type": "object",
+      "title": "Scope"
+     },
+     "scope_text": {
+      "type": "string",
+      "title": "Scope Text",
+      "default": ""
+     },
+     "expires_at": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Expires At"
      }
     },
     "type": "object",
@@ -9011,6 +9515,26 @@
      "offset"
     ],
     "title": "OutfitHistoryResponse"
+   },
+   "OutfitItemReplacementRequest": {
+    "properties": {
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     },
+     "replacement_item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Replacement Item Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "item_id",
+     "replacement_item_id"
+    ],
+    "title": "OutfitItemReplacementRequest"
    },
    "OutfitPlanCalendarResponse": {
     "properties": {
@@ -9582,6 +10106,28 @@
     ],
     "title": "PdfStyleSourceResponse"
    },
+   "PreferenceOverride": {
+    "properties": {
+     "preference_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Preference Id"
+     },
+     "type": {
+      "type": "string",
+      "maxLength": 40,
+      "title": "Type"
+     },
+     "value": {
+      "type": "string",
+      "maxLength": 120,
+      "title": "Value"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "PreferenceOverride"
+   },
    "PresignUploadRequest": {
     "properties": {
      "file_name": {
@@ -9894,6 +10440,7 @@
    "RecommendationGenerationSource": {
     "type": "string",
     "enum": [
+     "designer",
      "nightly",
      "departure",
      "read_time",
@@ -10983,6 +11530,32 @@
     "title": "ResurfaceInsightResponse",
     "description": "BE#80 — one lightweight \"you haven't worn this in a while, and it fits\ntoday\" nudge. Absent when there's no genuine candidate (never fabricated)."
    },
+   "ReviseOutfitRequest": {
+    "properties": {
+     "item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Item Id"
+     },
+     "replacement_item_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Replacement Item Id"
+     },
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
+     }
+    },
+    "type": "object",
+    "required": [
+     "item_id",
+     "replacement_item_id",
+     "request_id"
+    ],
+    "title": "ReviseOutfitRequest"
+   },
    "SenseCheckHistoryItem": {
     "properties": {
      "sense_check_id": {
@@ -11330,6 +11903,128 @@
      "trend"
     ],
     "title": "StyleTrendResponse"
+   },
+   "StylingConstraints": {
+    "properties": {
+     "locked_item_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Locked Item Ids"
+     },
+     "excluded_item_ids": {
+      "items": {
+       "type": "string",
+       "format": "uuid"
+      },
+      "type": "array",
+      "maxItems": 100,
+      "title": "Excluded Item Ids"
+     },
+     "goal": {
+      "type": "string",
+      "maxLength": 600,
+      "title": "Goal"
+     },
+     "notes": {
+      "items": {
+       "type": "string"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Notes"
+     },
+     "target_style": {
+      "type": "string",
+      "maxLength": 120,
+      "title": "Target Style"
+     },
+     "exploration": {
+      "type": "boolean",
+      "title": "Exploration",
+      "default": false
+     },
+     "preference_overrides": {
+      "items": {
+       "$ref": "#/components/schemas/PreferenceOverride"
+      },
+      "type": "array",
+      "maxItems": 8,
+      "title": "Preference Overrides"
+     },
+     "scene": {
+      "type": "string",
+      "enum": [
+       "commute",
+       "formal",
+       "casual",
+       "date",
+       "travel"
+      ],
+      "title": "Scene"
+     },
+     "target_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Target Date"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "title": "StylingConstraints"
+   },
+   "StylingResponse": {
+    "properties": {
+     "conversation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Conversation Id"
+     },
+     "revision": {
+      "type": "integer",
+      "title": "Revision"
+     },
+     "status": {
+      "type": "string",
+      "enum": [
+       "draft",
+       "adopted"
+      ],
+      "title": "Status"
+     },
+     "outfit": {
+      "$ref": "#/components/schemas/OutfitResponse"
+     },
+     "constraints": {
+      "$ref": "#/components/schemas/StylingConstraints"
+     },
+     "recommendation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Recommendation Id"
+     },
+     "recommendation_revision": {
+      "type": "integer",
+      "title": "Recommendation Revision"
+     },
+     "recommendation_date": {
+      "type": "string",
+      "format": "date",
+      "title": "Recommendation Date"
+     }
+    },
+    "type": "object",
+    "required": [
+     "conversation_id",
+     "revision",
+     "status",
+     "outfit",
+     "constraints"
+    ],
+    "title": "StylingResponse"
    },
    "TodayContextResponse": {
     "properties": {

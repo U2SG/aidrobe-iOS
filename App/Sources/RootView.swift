@@ -24,16 +24,21 @@ struct RootView: View {
     }
 }
 
+enum AppTab: Hashable { case today, wardrobe, ask, profile }
+
 struct MainTabView: View {
+    @Environment(AppModel.self) private var app
+
     var body: some View {
-        TabView {
-            Tab("今日", systemImage: "sun.max") {
+        @Bindable var app = app
+        TabView(selection: $app.selectedTab) {
+            Tab("今日", systemImage: "sun.max", value: .today) {
                 NavigationStack { TodayView() }
             }
-            Tab("衣橱", systemImage: "hanger") {
+            Tab("衣橱", systemImage: "hanger", value: .wardrobe) {
                 NavigationStack { WardrobeView() }
             }
-            Tab("问问", systemImage: "text.bubble") {
+            Tab("问问", systemImage: "text.bubble", value: .ask) {
                 NavigationStack {
                     AskView {
                         ToolLink(title: "该不该买", detail: "买之前，先看看衣橱里有没有") { ShouldIBuyView() }
@@ -41,7 +46,7 @@ struct MainTabView: View {
                     }
                 }
             }
-            Tab("我的", systemImage: "person") {
+            Tab("我的", systemImage: "person", value: .profile) {
                 NavigationStack { ProfileView() }
             }
         }

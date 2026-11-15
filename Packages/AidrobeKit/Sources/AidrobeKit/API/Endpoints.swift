@@ -66,6 +66,18 @@ public enum Endpoints {
         Endpoint(.get, "/v1/recommendations/outfits/\(outfitID)/items/\(itemID)/replacements")
     }
 
+    public static func reviseOutfit(
+        outfitID: String, itemID: String, replacementItemID: String, requestID: String
+    ) throws -> Endpoint<Wire.StylingResponse> {
+        try Endpoint(
+            .post,
+            "/v1/recommendations/outfits/\(outfitID)/revisions",
+            json: Wire.ReviseOutfitRequest(
+                itemId: itemID, replacementItemId: replacementItemID, requestId: requestID
+            )
+        )
+    }
+
     public static func setFavorite(_ favorite: Bool, outfitID: String) -> Endpoint<EmptyResponse> {
         Endpoint(favorite ? .post : .delete, "/v1/recommendations/outfits/\(outfitID)/favorite")
     }

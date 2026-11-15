@@ -72,30 +72,71 @@ public struct TokenPair: Sendable, Equatable {
     }
 }
 
-public final class TokenStore: Sendable {
+/// Token pairs and their session generation are read and changed under one
+/// lock. Login/logout starts a generation; refresh only rotates its tokens.
+public final class TokenStore: @unchecked Sendable {
+    struct Snapshot: Sendable, Equatable {
+        let generation: UUID
+        let tokens: TokenPair?
+    }
+
     private enum Key {
         static let access = "aidrobe.accessToken"
         static let refresh = "aidrobe.refreshToken"
     }
 
     private let store: any SecureStore
+    private let lock = NSLock()
+    private var generationID = UUID()
 
     public init(store: any SecureStore) {
         self.store = store
     }
 
-    public var tokens: TokenPair? {
-        guard let access = store.string(for: Key.access) else { return nil }
-        return TokenPair(accessToken: access, refreshToken: store.string(for: Key.refresh))
-    }
+    public var generation: UUID { lock.withLock { generationID } }
+    public var tokens: TokenPair? { snapshot.tokens }
+    var snapshot: Snapshot { lock.withLock { snapshotLocked() } }
 
     public func save(_ tokens: TokenPair) {
-        store.set(tokens.accessToken, for: Key.access)
-        store.set(tokens.refreshToken, for: Key.refresh)
+        lock.withLock {
+            generationID = UUID()
+            writeLocked(tokens)
+        }
     }
 
     public func clear() {
-        store.set(nil, for: Key.access)
-        store.set(nil, for: Key.refresh)
+        lock.withLock {
+            generationID = UUID()
+            writeLocked(nil)
+        }
+    }
+
+    func rotate(_ tokens: TokenPair, ifCurrent expected: Snapshot) -> Snapshot? {
+        lock.withLock {
+            guard snapshotLocked() == expected else { return nil }
+            writeLocked(tokens)
+            return snapshotLocked()
+        }
+    }
+
+    func clear(ifCurrent expected: Snapshot) -> Bool {
+        lock.withLock {
+            guard snapshotLocked() == expected else { return false }
+            generationID = UUID()
+            writeLocked(nil)
+            return true
+        }
+    }
+
+    private func snapshotLocked() -> Snapshot {
+        let tokens = store.string(for: Key.access).map {
+            TokenPair(accessToken: $0, refreshToken: store.string(for: Key.refresh))
+        }
+        return Snapshot(generation: generationID, tokens: tokens)
+    }
+
+    private func writeLocked(_ tokens: TokenPair?) {
+        store.set(tokens?.accessToken, for: Key.access)
+        store.set(tokens?.refreshToken, for: Key.refresh)
     }
 }
