@@ -167,7 +167,10 @@ public actor APIClient {
         }
         defer { if refreshTask?.id == flight.id { refreshTask = nil } }
         let pair = try await flight.task.value
-        try requireSession(session)
+        // The refresh outlives any individual waiter. Persist its rotated
+        // credentials even if that caller was cancelled while waiting.
+        // Account changes still invalidate the old generation.
+        guard tokens.generation == session.generation else { throw CancellationError() }
         if let updated = tokens.rotate(pair, ifCurrent: session) { return updated }
         // A waiter on this same refresh may have stored the pair already.
         let updated = tokens.snapshot
