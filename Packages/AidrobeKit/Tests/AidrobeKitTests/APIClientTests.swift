@@ -155,6 +155,36 @@ private func makeClient(
         #expect(transport.requests.map { $0.url!.path() } == ["/v1/x", "/v1/auth/refresh", "/v1/x"])
     }
 
+    @Test func cancelledWaiterStillPersistsRotatedCredentials() async throws {
+        let refreshArrived = ResponseGate()
+        let releaseRefresh = ResponseGate()
+        let events = EventRecorder()
+        let (client, transport, store) = makeClient(
+            tokens: TokenPair(accessToken: "A1", refreshToken: "R1"), events: events
+        ) { request in
+            if request.url?.path() == "/v1/auth/refresh" {
+                await refreshArrived.open()
+                await releaseRefresh.wait()
+                return (200, Self.tokensBody)
+            }
+            return request.value(forHTTPHeaderField: "Authorization") == "Bearer A2"
+                ? (200, #"{"item_id":"ok"}"#)
+                : (401, #"{"message":"expired"}"#)
+        }
+        let pending = Task { try await client.send(Endpoint<Item>(.get, "/v1/x")) }
+        await refreshArrived.wait()
+        pending.cancel()
+        await releaseRefresh.open()
+
+        await #expect(throws: CancellationError.self) { try await pending.value }
+        #expect(store.tokens == TokenPair(accessToken: "A2", refreshToken: "R2"))
+        #expect(events.events.isEmpty)
+
+        let next = try await client.send(Endpoint<Item>(.get, "/v1/x"))
+        #expect(next.itemId == "ok")
+        #expect(transport.requests.filter { $0.url!.path() == "/v1/auth/refresh" }.count == 1)
+    }
+
     @Test func concurrentRequestsShareOneRefresh() async throws {
         let (client, transport, _) = makeClient(tokens: TokenPair(accessToken: "A1", refreshToken: "R1")) { request in
             if request.url?.path() == "/v1/auth/refresh" {
