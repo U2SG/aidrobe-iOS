@@ -191,6 +191,10 @@ final class TodayModel {
                 outfitImageIssues[id] = userMessage(for: error)
                 return
             }
+            if (error as? APIError)?.status == 429 {
+                notice = "今天的整套图生成次数已用完"
+                return
+            }
             notice = (error as? APIError)?.isFeatureDisabled == true
                 ? "当前服务还没有开启搭配生图"
                 : userMessage(for: error)

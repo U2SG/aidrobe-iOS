@@ -101,8 +101,6 @@ private struct TodayPage: View {
     @State private var feedbackOutfit: Wire.OutfitResponse?
     @State private var showsContext = false
     @State private var shareDraft: OutfitShareDraft?
-    @State private var generationTarget: Wire.OutfitResponse?
-    @State private var showsGenerationConfirm = false
     @State private var showPieces: Set<String> = []
 
     private var outfit: Wire.OutfitResponse {
@@ -153,11 +151,6 @@ private struct TodayPage: View {
         }
         .sheet(item: $shareDraft) { draft in
             OutfitShareSheet(draft: draft)
-        }
-        .confirmationDialog("生成整套搭配图", isPresented: $showsGenerationConfirm, presenting: generationTarget) { outfit in
-            Button("生成") { Task { await model.generateImage(for: outfit) } }
-        } message: { _ in
-            Text("会把这套搭配的衣物参考图发送给 OpenAI。生成图里的颜色和细节可能有变化。")
         }
         .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
         .sensoryFeedback(.selection, trigger: currentID)
@@ -280,8 +273,7 @@ private struct TodayPage: View {
                     .foregroundStyle(Color.secondaryLabel)
             }
             Button(issue == nil ? "生成整套搭配图" : "重新生成整套图", systemImage: "sparkles") {
-                generationTarget = outfit
-                showsGenerationConfirm = true
+                Task { await model.generateImage(for: outfit) }
             }
             .buttonStyle(.glass)
         }
