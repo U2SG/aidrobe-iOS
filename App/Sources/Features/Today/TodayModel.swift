@@ -131,7 +131,7 @@ final class TodayModel {
         let result = try await api.send(Endpoints.refreshToday(chipID: chip?.id, text: text))
         apply(result)
         appliedChip = result.appliedContext == nil ? nil : chip
-        appliedText = result.appliedContext?.overrideText
+        appliedText = chip == nil ? result.appliedContext?.overrideText : nil
         swaps = [:]
     }
 
