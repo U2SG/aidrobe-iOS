@@ -91,6 +91,7 @@ struct FeedbackSheet: View {
     @State private var kind: FeedbackKind
     @State private var selected: Set<String> = []
     @State private var isSending = false
+    @State private var errorMessage: String?
 
     private static let positiveKeys: Set<String> = ["complimented", "comfortable", "confident"]
 
@@ -112,7 +113,11 @@ struct FeedbackSheet: View {
             Text("这套怎么样？")
                 .font(.display(26, relativeTo: .title))
                 .foregroundStyle(Color.label)
-            Picker("感受", selection: $kind) {
+            Picker("感受", selection: Binding(get: { kind }, set: { value in
+                guard kind != value else { return }
+                kind = value
+                selected.removeAll()
+            })) {
                 Text("挺好").tag(FeedbackKind.like)
                 Text("不太合适").tag(FeedbackKind.dislike)
             }
@@ -125,19 +130,28 @@ struct FeedbackSheet: View {
                         }
                     }
                 }
-                Text("选中的原因会直接影响之后的搭配。")
+                Text(selected.isEmpty ? "可选原因，帮助调整下一次搭配。" : "已选 \(selected.count) 项原因")
                     .font(.footnote)
                     .foregroundStyle(Color.tertiaryLabel)
             }
+            if let errorMessage {
+                Text(errorMessage).font(.footnote).foregroundStyle(Color.danger)
+            }
             Spacer(minLength: 0)
             Button {
+                let submission = (kind, selected.sorted())
                 isSending = true
+                errorMessage = nil
                 Task {
-                    if await model.sendFeedback(kind, tags: Array(selected), for: outfit) { dismiss() }
+                    if await model.sendFeedback(submission.0, tags: submission.1, for: outfit) {
+                        dismiss()
+                    } else {
+                        errorMessage = model.notice ?? "没能保存反馈，请重试。"
+                    }
                     isSending = false
                 }
             } label: {
-                Text("记下").frame(maxWidth: .infinity)
+                Text(isSending ? "正在记下…" : "记下").frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .controlSize(.large)
@@ -148,58 +162,124 @@ struct FeedbackSheet: View {
         .padding(.top, Spacing.row)
         .presentationDetents([.medium])
         .presentationBackground(Color.background)
-        .onChange(of: kind) { selected = [] }
+        .disabled(isSending)
+        .interactiveDismissDisabled(isSending)
     }
 }
 
-/// Tell Today what is different about the day, then get a set that fits.
+/// A one-time request that applies to the next recommendation.
 struct ContextSheet: View {
     let model: TodayModel
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var editingRequest: Bool
     @State private var chip: ContextChip?
+    @State private var request = ""
+    @State private var errorMessage: String?
+
+    private static let compact = PresentationDetent.height(410)
+    @State private var detent = Self.compact
+
+    private var cleaned: String { request.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var tooLong: Bool { cleaned.unicodeScalars.count > Endpoints.todayContextTextLimit }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: Spacing.section) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("今天有什么不一样？")
-                    .font(.display(26, relativeTo: .title))
-                    .foregroundStyle(Color.label)
-                Text("只影响今天这一次，不会记成你的长期偏好。")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondaryLabel)
-            }
-            FlowLayout {
-                ForEach(ContextChip.all) { option in
-                    Chip(title: option.title, isSelected: chip == option) {
-                        chip = chip == option ? nil : option
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                HStack(alignment: .top, spacing: Spacing.tight) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("今天有什么不一样？")
+                            .font(.display(26, relativeTo: .title))
+                            .foregroundStyle(Color.label)
+                            .accessibilityAddTraits(.isHeader)
+                        Text("只影响今天这一次，不会记成你的长期偏好。")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.secondaryLabel)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    Button { dismiss() } label: {
+                        Image(systemName: "xmark")
+                            .font(.subheadline.weight(.semibold))
+                            .frame(width: 44, height: 44)
+                            .background(Color.elevatedBackground, in: Circle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("关闭")
+                }
+                FlowLayout {
+                    ForEach(ContextChip.all) { option in
+                        Chip(title: option.title, isSelected: chip == option && cleaned.isEmpty) {
+                            request = ""
+                            chip = chip == option ? nil : option
+                            editingRequest = false
+                            errorMessage = nil
+                        }
+                    }
+                }
+                VStack(alignment: .leading, spacing: Spacing.tight) {
+                    Text("也可以自己说")
+                        .font(.subheadline.weight(.semibold))
+                    TextField("例如：下午有会，想穿得正式一点", text: $request, axis: .vertical)
+                        .lineLimit(2...4)
+                        .focused($editingRequest)
+                        .accessibilityLabel("今天的穿搭要求")
+                        .padding(Spacing.control)
+                        .background(Color.elevatedBackground, in: RoundedRectangle(cornerRadius: Radius.tile))
+                        .overlay(RoundedRectangle(cornerRadius: Radius.tile).strokeBorder(Color.separator))
+                        .onChange(of: request) {
+                            if !cleaned.isEmpty { chip = nil }
+                            errorMessage = nil
+                        }
+                    if tooLong {
+                        Text("最多输入 200 个字符。").font(.footnote).foregroundStyle(Color.danger)
+                    } else if let errorMessage {
+                        Text(errorMessage).font(.footnote).foregroundStyle(Color.danger)
                     }
                 }
             }
-            Spacer(minLength: 0)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.screen)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
             Button {
+                let choice = cleaned.isEmpty ? chip : nil
+                let text = cleaned.isEmpty ? nil : cleaned
+                errorMessage = nil
+                editingRequest = false
                 Task {
-                    await model.refresh(chip: chip)
-                    dismiss()
+                    do {
+                        try await model.refresh(chip: choice, text: text)
+                        if (choice != nil || text != nil) && model.appliedChip == nil && model.appliedText == nil {
+                            errorMessage = "当前服务未启用临时穿搭要求。"
+                        } else {
+                            dismiss()
+                        }
+                    } catch {
+                        errorMessage = TodayModel.refreshMessage(error)
+                    }
                 }
             } label: {
-                Group {
-                    if model.isRefreshing {
-                        ProgressView()
-                    } else {
-                        Text(chip == nil ? "重新搭一套" : "按这个重新搭")
-                    }
-                }
-                .frame(maxWidth: .infinity)
+                Text(model.isRefreshing ? "正在重新搭…" : (chip == nil && cleaned.isEmpty ? "重新搭一套" : "按这个重新搭"))
+                    .frame(maxWidth: .infinity)
             }
             .buttonStyle(.glassProminent)
             .controlSize(.large)
-            .disabled(model.isRefreshing)
+            .disabled(tooLong)
+            .padding(.horizontal, Spacing.screen)
+            .padding(.vertical, Spacing.tight)
+            .background(Color.background)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(Spacing.screen)
-        .padding(.top, Spacing.row)
-        .presentationDetents([.medium])
+        .disabled(model.isRefreshing)
+        .interactiveDismissDisabled(model.isRefreshing)
+        .presentationDetents([Self.compact, .large], selection: $detent)
+        .presentationDragIndicator(.visible)
         .presentationBackground(Color.background)
-        .onAppear { chip = model.appliedChip }
+        .onChange(of: editingRequest) { _, focused in
+            detent = focused ? .large : Self.compact
+        }
+        .onAppear {
+            chip = model.appliedChip
+            request = model.appliedText ?? ""
+        }
     }
 }

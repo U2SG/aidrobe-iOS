@@ -194,7 +194,9 @@ private struct TodayPage: View {
             }
             if let place = weather.locationName { parts.append(place) }
         }
-        if let chip = model.appliedChip { parts.append("已按「\(chip.title)」搭配") }
+        if let context = model.appliedText ?? model.appliedChip?.title {
+            parts.append("已按「\(context)」搭配")
+        }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -453,8 +455,12 @@ private struct TodayPage: View {
     private func another() async {
         let outfits = model.outfits
         guard outfits.count > 1, let index = outfits.firstIndex(where: { $0.outfitId == outfit.outfitId }) else {
-            await model.refresh(chip: model.appliedChip)
-            currentID = model.outfits.first?.outfitId
+            do {
+                try await model.refresh(chip: model.appliedChip, text: model.appliedText)
+                currentID = model.outfits.first?.outfitId
+            } catch {
+                model.notice = TodayModel.refreshMessage(error)
+            }
             return
         }
         withAnimation { currentID = outfits[(index + 1) % outfits.count].outfitId }

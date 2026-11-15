@@ -18,6 +18,7 @@ enum Garment {
 
     static let colors: [(key: String, label: String, swatch: Color)] = [
         ("white", "白色", Color(red: 0.96, green: 0.95, blue: 0.92)),
+        ("cream", "奶油色", Color(red: 0.98, green: 0.94, blue: 0.85)),
         ("black", "黑色", Color(red: 0.14, green: 0.13, blue: 0.12)),
         ("gray", "灰色", Color(red: 0.56, green: 0.55, blue: 0.53)),
         ("beige", "米色", Color(red: 0.85, green: 0.78, blue: 0.66)),
@@ -26,8 +27,11 @@ enum Garment {
         ("brown", "棕色", Color(red: 0.42, green: 0.27, blue: 0.19)),
         ("navy", "藏青色", Color(red: 0.14, green: 0.18, blue: 0.27)),
         ("blue", "蓝色", Color(red: 0.33, green: 0.47, blue: 0.68)),
+        ("light_blue", "浅蓝色", Color(red: 0.64, green: 0.76, blue: 0.87)),
         ("green", "绿色", Color(red: 0.37, green: 0.40, blue: 0.27)),
+        ("olive", "橄榄绿", Color(red: 0.43, green: 0.44, blue: 0.25)),
         ("red", "红色", Color(red: 0.66, green: 0.22, blue: 0.19)),
+        ("maroon", "酒红色", Color(red: 0.38, green: 0.12, blue: 0.18)),
         ("pink", "粉色", Color(red: 0.89, green: 0.71, blue: 0.72)),
         ("yellow", "黄色", Color(red: 0.89, green: 0.76, blue: 0.36)),
         ("purple", "紫色", Color(red: 0.45, green: 0.36, blue: 0.56)),

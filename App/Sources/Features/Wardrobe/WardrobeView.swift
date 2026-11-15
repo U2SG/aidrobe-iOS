@@ -6,6 +6,10 @@ import SwiftUI
 struct WardrobeView: View {
     @Environment(AppModel.self) private var app
     @State private var category: String?
+    @State private var status: Wire.WardrobeItemStatus?
+    @State private var season: String?
+    @State private var color: String?
+    @State private var showsFilters = false
     @State private var query = ""
     @State private var notice: String?
     @State private var isImporting = false
@@ -14,11 +18,22 @@ struct WardrobeView: View {
 
     private var store: WardrobeStore { app.wardrobe }
 
+    private var activeFilters: Int { [status?.rawValue, season, color].compactMap { $0 }.count }
+
+    private var colors: [String] {
+        Set(store.items.map { $0.colorMain.lowercased() }).filter { !$0.isEmpty }.sorted()
+    }
+
     private var visible: [Wire.WardrobeItemResponse] {
-        store.items
+        let search = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        return store.items
             .filter { item in
                 (category == nil || item.category == category)
-                    && (query.isEmpty || item.displayName.localizedCaseInsensitiveContains(query))
+                    && (status == nil || item.status == status)
+                    && (season == nil || (item.seasonTags ?? []).contains { $0 == season || $0 == "all_season" })
+                    && (color == nil || item.colorMain.lowercased() == color)
+                    && (search.isEmpty || item.displayName.localizedCaseInsensitiveContains(search)
+                        || Garment.color(item.colorMain).localizedCaseInsensitiveContains(search))
             }
             // Stable sort: grouped by kind, newest first within a kind (the server's order).
             .sorted { rank($0.category) < rank($1.category) }
@@ -77,6 +92,7 @@ struct WardrobeView: View {
         .sheet(isPresented: $isImporting) {
             ImportFlowView { Task { await store.load() } }
         }
+        .sheet(isPresented: $showsFilters) { filters }
         .toast($notice)
         .task { await store.load() }
         .task(id: store.hasPendingProductImages) { await store.refreshPendingProductImages() }
@@ -85,10 +101,18 @@ struct WardrobeView: View {
     private var catalogue: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.row) {
-                Text(summary)
-                    .font(.subheadline)
-                    .foregroundStyle(Color.secondaryLabel)
-                    .padding(.horizontal, Spacing.screen)
+                HStack {
+                    Text(activeFilters > 0 ? "找到 \(visible.count) 件" : summary)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.secondaryLabel)
+                    Spacer()
+                    Button(activeFilters == 0 ? "筛选" : "筛选 · \(activeFilters)", systemImage: "line.3.horizontal.decrease") {
+                        showsFilters = true
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.regular)
+                }
+                .padding(.horizontal, Spacing.screen)
                 ScrollView(.horizontal) {
                     HStack(spacing: Spacing.tight) {
                         Chip(title: "全部", isSelected: category == nil) { category = nil }
@@ -102,7 +126,7 @@ struct WardrobeView: View {
                 .contentMargins(.horizontal, Spacing.screen, for: .scrollContent)
                 .scrollIndicators(.hidden)
                 if visible.isEmpty {
-                    Text("没有找到「\(query)」")
+                    Text("没有符合条件的衣物")
                         .font(.body)
                         .foregroundStyle(Color.secondaryLabel)
                         .padding(.horizontal, Spacing.screen)
@@ -126,6 +150,45 @@ struct WardrobeView: View {
         .searchable(text: $query, prompt: "找一件衣服")
         .refreshable { await store.load() }
         .animation(.snappy, value: category)
+    }
+
+    private var filters: some View {
+        NavigationStack {
+            Form {
+                Picker("状态", selection: $status) {
+                    Text("全部").tag(nil as Wire.WardrobeItemStatus?)
+                    ForEach(Wire.WardrobeItemStatus.allCases, id: \.self) { value in
+                        Text(Garment.status(value)).tag(Optional(value))
+                    }
+                }
+                Picker("季节", selection: $season) {
+                    Text("全部").tag(nil as String?)
+                    ForEach(Garment.seasonOptions, id: \.key) { option in
+                        Text(option.label).tag(Optional(option.key))
+                    }
+                }
+                Picker("颜色", selection: $color) {
+                    Text("全部").tag(nil as String?)
+                    ForEach(colors, id: \.self) { value in
+                        Text(Garment.color(value)).tag(Optional(value))
+                    }
+                }
+                Button("清除筛选") {
+                    status = nil
+                    season = nil
+                    color = nil
+                }
+                .disabled(activeFilters == 0)
+            }
+            .navigationTitle("筛选衣橱")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { showsFilters = false }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
     }
 
     private var summary: String {
