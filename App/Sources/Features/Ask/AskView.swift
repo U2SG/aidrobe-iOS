@@ -172,33 +172,40 @@ struct AskView<Tools: View>: View {
     }
 
     private func inputBar(_ model: AskModel) -> some View {
-        GlassEffectContainer(spacing: Spacing.tight) {
-            HStack(alignment: .bottom, spacing: Spacing.tight) {
-                TextField("说说想法，或调整这一套", text: $draft, axis: .vertical)
-                    .lineLimit(1...4)
-                    .focused($isTyping)
-                    .submitLabel(.send)
-                    .onSubmit { send(draft, model) }
-                    .padding(.horizontal, Spacing.row)
-                    .padding(.vertical, 13)
-                    .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
-                Button {
-                    send(draft, model)
-                } label: {
-                    Group {
-                        if model.isBusy {
-                            ProgressView()
-                        } else {
-                            Image(systemName: "arrow.up").fontWeight(.semibold)
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            if model.hasUnresolvedQuestion {
+                Text("上一句还没确认结果。请重试那一句，或开启新对话后再聊。")
+                    .font(.footnote)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
+            GlassEffectContainer(spacing: Spacing.tight) {
+                HStack(alignment: .bottom, spacing: Spacing.tight) {
+                    TextField("说说想法，或调整这一套", text: $draft, axis: .vertical)
+                        .lineLimit(1...4)
+                        .focused($isTyping)
+                        .submitLabel(.send)
+                        .onSubmit { send(draft, model) }
+                        .padding(.horizontal, Spacing.row)
+                        .padding(.vertical, 13)
+                        .glassEffect(.regular.interactive(), in: .rect(cornerRadius: 24))
+                    Button {
+                        send(draft, model)
+                    } label: {
+                        Group {
+                            if model.isBusy {
+                                ProgressView()
+                            } else {
+                                Image(systemName: "arrow.up").fontWeight(.semibold)
+                            }
                         }
+                        .frame(width: 22, height: 22)
                     }
-                    .frame(width: 22, height: 22)
+                    .buttonStyle(.glassProminent)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.large)
+                    .disabled(!model.canAsk || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .accessibilityLabel("发送")
                 }
-                .buttonStyle(.glassProminent)
-                .buttonBorderShape(.circle)
-                .controlSize(.large)
-                .disabled(model.isBusy || model.needsLatestVersion || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                .accessibilityLabel("发送")
             }
         }
         .padding(.horizontal, Spacing.screen)
@@ -206,7 +213,7 @@ struct AskView<Tools: View>: View {
     }
 
     private func send(_ question: String, _ model: AskModel) {
-        guard !model.isBusy, !model.needsLatestVersion else { return }
+        guard model.canAsk else { return }
         draft = ""
         isTyping = false
         Task { await model.ask(question) }
@@ -457,13 +464,23 @@ private struct AskEntryView: View {
                 } else if !garments.isEmpty { garmentRow(garments) }
                 if model.canGiveFeedback(entry) { feedback }
             case .unavailable:
-                note("问问暂时还答不了。开通后，这里会用你衣橱里的衣服来回答。")
+                note("问问暂时还答不了，可以稍后重试。")
+                recovery
             case let .failed(message):
                 note(message)
-                Button("再问一次") { Task { await model.retry(entry) } }
-                    .buttonStyle(.glass)
-                    .disabled(model.isBusy || model.needsLatestVersion)
+                recovery
             }
+        }
+    }
+
+    private var recovery: some View {
+        HStack(spacing: Spacing.control) {
+            Button("再问一次") { Task { await model.retry(entry) } }
+                .buttonStyle(.glass)
+                .disabled(model.isBusy || model.needsLatestVersion)
+            Button("新对话") { Task { await model.startOver() } }
+                .buttonStyle(.glass)
+                .disabled(model.isBusy)
         }
     }
 

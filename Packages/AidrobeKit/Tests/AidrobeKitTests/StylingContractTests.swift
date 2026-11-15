@@ -155,7 +155,8 @@ private actor LostStylingResponse {
             conversationID: StylingFixture.conversation, revision: 2,
             excludedItemIDs: [], requestID: StylingFixture.request
         )
-        let body = try #require(JSONSerialization.jsonObject(with: #require(change.body)) as? [String: Any])
+        let changeData = try #require(change.body)
+        let body = try #require(JSONSerialization.jsonObject(with: changeData) as? [String: Any])
         #expect(body["locked_item_ids"] == nil)
         #expect(body["excluded_item_ids"] as? [String] == [])
         #expect(body["expected_revision"] as? Int == 2)
@@ -168,6 +169,13 @@ private actor LostStylingResponse {
         """.utf8))
         #expect(response.styling == nil)
         #expect(response.answer == "可以配白色鞋子。")
+        let continuation = try Endpoints.ask(
+            "那鞋子呢？", conversationID: StylingFixture.conversation, requestID: StylingFixture.request
+        )
+        let data = try #require(continuation.body)
+        let question = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: data)
+        #expect(question.expectedRevision == nil)
+        #expect(question.conversationId == StylingFixture.conversation)
     }
 
     @Test func scopedMemoryKeepsServerCopyAndExpiryAndAcceptsOldPayloads() throws {

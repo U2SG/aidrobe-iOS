@@ -88,6 +88,17 @@ final class AskModel {
     }
 
     var isBusy: Bool { isAsking || isRestoring || isUpdatingDesign || outfitActions.isRevising }
+    /// A lost first answer can already have created a server conversation. Keep
+    /// its stable retry separate from any explicitly started new conversation.
+    var hasUnresolvedQuestion: Bool {
+        entries.contains {
+            switch $0.state {
+            case .failed, .unavailable: true
+            case .asking, .answered: false
+            }
+        }
+    }
+    var canAsk: Bool { !isBusy && !needsLatestVersion && !hasUnresolvedQuestion }
     var canRetryAction: Bool { retryAction != nil && !needsLatestVersion }
     var canRetryRestore: Bool { restoringID != nil || conversationID != nil }
     var lockedItemIDs: [String] { styling?.constraints.lockedItemIds ?? [] }
@@ -117,10 +128,10 @@ final class AskModel {
 
     func ask(_ raw: String) async {
         let question = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !question.isEmpty, !isBusy, !needsLatestVersion else { return }
+        guard !question.isEmpty, canAsk else { return }
         let entry = Entry(
             question: question, state: .asking, conversationID: conversationID,
-            expectedRevision: styling?.revision ?? (conversationID == nil ? nil : 0),
+            expectedRevision: styling?.revision,
             baseOutfitID: baseOutfit?.outfitId
         )
         entries.append(entry)
