@@ -101,8 +101,6 @@ private struct TodayPage: View {
     @State private var feedbackOutfit: Wire.OutfitResponse?
     @State private var showsContext = false
     @State private var shareDraft: OutfitShareDraft?
-    @State private var generationTarget: Wire.OutfitResponse?
-    @State private var showsGenerationConfirm = false
     @State private var showPieces: Set<String> = []
 
     private var outfit: Wire.OutfitResponse {
@@ -153,11 +151,6 @@ private struct TodayPage: View {
         }
         .sheet(item: $shareDraft) { draft in
             OutfitShareSheet(draft: draft)
-        }
-        .confirmationDialog("生成整套搭配图", isPresented: $showsGenerationConfirm, presenting: generationTarget) { outfit in
-            Button("生成") { Task { await model.generateImage(for: outfit) } }
-        } message: { _ in
-            Text("会把这套搭配的衣物参考图发送给 OpenAI。生成图里的颜色和细节可能有变化。")
         }
         .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
         .sensoryFeedback(.selection, trigger: currentID)
@@ -234,19 +227,7 @@ private struct TodayPage: View {
                                 }
                             }
 
-                        if model.rejectedOutfitImages.contains(outfit.outfitId) && !hasSwaps {
-                            Text("整套图未通过核对")
-                                .font(.footnote)
-                                .foregroundStyle(Color.secondaryLabel)
-                        } else if !hasSwaps {
-                            let previewIsOpen = showPieces.contains(outfit.outfitId)
-                            Button(previewIsOpen ? "返回整套搭配图" : "看单品拼图") {
-                                if !showPieces.insert(outfit.outfitId).inserted {
-                                    showPieces.remove(outfit.outfitId)
-                                }
-                            }
-                            .font(.footnote)
-                        }
+                        if !hasSwaps { outfitImageActions(outfit) }
                     }
                     .containerRelativeFrame(.horizontal)
                 }
@@ -261,30 +242,40 @@ private struct TodayPage: View {
 
     @ViewBuilder
     private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem], hasSwaps: Bool) -> some View {
-        if hasSwaps || showPieces.contains(outfit.outfitId) || model.rejectedOutfitImages.contains(outfit.outfitId) {
-            OutfitBoard(items: items) { slot in
-                swapTarget = SwapTarget(outfit: outfit, slot: slot)
-            }
-        } else if let image = model.generatedImages[outfit.outfitId] {
+        if !hasSwaps, !showPieces.contains(outfit.outfitId), let image = model.generatedImages[outfit.outfitId] {
             GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                 .accessibilityHidden(false)
                 .accessibilityLabel("AI 生成的整套搭配图")
         } else {
-            Color.elevatedBackground
-                .aspectRatio(0.86, contentMode: .fit)
-                .clipShape(.rect(cornerRadius: Radius.card))
-                .overlay {
-                    if model.generatingOutfits.contains(outfit.outfitId) {
-                        ProgressView("正在准备整套搭配图…")
-                            .font(.footnote)
-                    } else {
-                        Button("生成整套搭配图", systemImage: "sparkles") {
-                            generationTarget = outfit
-                            showsGenerationConfirm = true
-                        }
-                        .buttonStyle(.glass)
-                    }
-                }
+            OutfitBoard(items: items) { slot in
+                swapTarget = SwapTarget(outfit: outfit, slot: slot)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func outfitImageActions(_ outfit: Wire.OutfitResponse) -> some View {
+        let id = outfit.outfitId
+        if model.generatedImages[id] != nil {
+            let previewIsOpen = showPieces.contains(id)
+            Button(previewIsOpen ? "返回整套搭配图" : "看单品拼图") {
+                if !showPieces.insert(id).inserted { showPieces.remove(id) }
+            }
+            .font(.footnote)
+        } else if model.generatingOutfits.contains(id) {
+            ProgressView("正在准备整套搭配图…")
+                .font(.footnote)
+        } else {
+            let issue = model.outfitImageIssues[id]
+            if let issue {
+                Text(issue)
+                    .font(.footnote)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
+            Button(issue == nil ? "生成整套搭配图" : "重新生成整套图", systemImage: "sparkles") {
+                Task { await model.generateImage(for: outfit) }
+            }
+            .buttonStyle(.glass)
         }
     }
 

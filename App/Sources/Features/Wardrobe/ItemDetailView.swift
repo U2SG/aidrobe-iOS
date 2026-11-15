@@ -1,5 +1,6 @@
 import AidrobeKit
 import SwiftUI
+import UIKit
 
 /// One garment: its picture, how it has been worn, and whether it can be
 /// picked for an outfit right now.
@@ -8,7 +9,7 @@ struct ItemDetailView: View {
     @Environment(AppModel.self) private var app
     @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @Environment(\.dismiss) private var dismiss
-    @State private var showsOriginal = false
+    @State private var showsOriginalPhoto = false
     @State private var isEditing = false
     @State private var confirmsDelete = false
     @State private var notice: String?
@@ -36,37 +37,47 @@ struct ItemDetailView: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 GarmentImage(
-                    url: showsOriginal ? WardrobeStore.originalURL(item) : WardrobeStore.imageURL(item),
+                    url: WardrobeStore.imageURL(item),
                     forceOriginal: true,
                     fit: true,
-                    matchProductBackground: !showsOriginal && item.cutoutStatus == "ready"
+                    matchProductBackground: item.cutoutStatus == "ready"
                 )
                     .aspectRatio(1, contentMode: .fit)
                     .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.card))
-                    .overlay(alignment: .bottomTrailing) {
-                        if let original = item.originalImageUrl, let cover = item.coverImageUrl, original != cover {
-                            Button(showsOriginal ? (item.cutoutStatus == "ready" ? "看商品图" : "看封面") : "看原图") {
-                                showsOriginal.toggle()
+                    .overlay(alignment: .bottom) {
+                        HStack {
+                            if item.cutoutStatus == "ready" {
+                                Label("AI 单品图", systemImage: "sparkles")
+                                    .padding(.horizontal, 10)
+                                    .padding(.vertical, 6)
+                                    .background(.regularMaterial, in: .capsule)
                             }
-                                .font(.footnote)
+                            Spacer()
+                            if WardrobeStore.originalURL(item) != nil {
+                                Button("看原图", systemImage: "arrow.up.left.and.arrow.down.right") {
+                                    showsOriginalPhoto = true
+                                }
                                 .buttonStyle(.glass)
-                                .padding(Spacing.control)
+                                .controlSize(.large)
+                            }
                         }
+                        .font(.footnote)
+                        .padding(Spacing.control)
                     }
                 if item.cutoutStatus == "queued" {
-                    Label("正在生成商品图…", systemImage: "sparkles")
+                    Label("正在生成单品图…", systemImage: "sparkles")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 } else if item.cutoutStatus == "rejected" {
-                    Text("商品图未通过核对，已保留原封面")
+                    Text("单品图未通过核对，已保留原封面")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 } else if item.cutoutStatus == "failed" {
-                    Text("商品图生成失败，已保留参考图")
+                    Text("单品图生成失败，已保留原封面")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 } else if item.cutoutStatus == "skipped" {
-                    Text("暂无商品图")
+                    Text("暂无 AI 单品图")
                         .font(.footnote)
                         .foregroundStyle(Color.secondaryLabel)
                 }
@@ -153,6 +164,11 @@ struct ItemDetailView: View {
             }
         }
         .sheet(isPresented: $isEditing) { ItemEditSheet(item: item) }
+        .fullScreenCover(isPresented: $showsOriginalPhoto) {
+            OriginalGarmentPhoto {
+                try await store.originalPhotoURL(item.itemId) ?? WardrobeStore.originalURL(item)
+            }
+        }
         .sheet(isPresented: $showsRecognition, onDismiss: { recognition = nil }) {
             if let recognition { ItemEditSheet(item: item, recognition: recognition) }
         }
@@ -191,8 +207,8 @@ struct ItemDetailView: View {
     private func productImageAction(_ item: Wire.WardrobeItemResponse) -> String {
         switch item.cutoutStatus {
         case "queued": "生成中…"
-        case "ready", "failed", "rejected": "重新生成商品图"
-        default: "生成商品图"
+        case "ready", "failed", "rejected": "重新生成单品图"
+        default: "生成单品图"
         }
     }
 
@@ -202,7 +218,6 @@ struct ItemDetailView: View {
             defer { isRequestingImage = false }
             do {
                 try await store.requestProductImage(item.itemId)
-                showsOriginal = false
             } catch {
                 notice = userMessage(for: error)
             }
@@ -241,6 +256,91 @@ struct ItemDetailView: View {
                 notice = userMessage(for: error)
             }
         }
+    }
+}
+
+private struct OriginalGarmentPhoto: View {
+    let photoURL: () async throws -> URL?
+    @Environment(\.dismiss) private var dismiss
+    @State private var photo: UIImage?
+    @State private var failed = false
+    @State private var attempt = 0
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                Color.background.ignoresSafeArea()
+                if let photo {
+                    ZoomableGarmentPhoto(photo: photo)
+                        .accessibilityLabel("衣物原照")
+                } else if failed {
+                    ContentUnavailableView {
+                        Label("原图暂时打不开", systemImage: "photo")
+                    } actions: {
+                        Button("重试") { attempt += 1 }.buttonStyle(.bordered)
+                    }
+                } else {
+                    ProgressView("正在加载原图…")
+                }
+            }
+            .navigationTitle("原图")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("完成") { dismiss() }
+                }
+            }
+            .task(id: attempt) {
+                failed = false
+                do {
+                    guard let url = try await photoURL() else { failed = true; return }
+                    let (data, _) = try await URLSession.shared.data(from: url)
+                    try Task.checkCancellation()
+                    photo = UIImage(data: data)
+                    failed = photo == nil
+                } catch {
+                    if !Task.isCancelled { failed = true }
+                }
+            }
+        }
+    }
+}
+
+private struct ZoomableGarmentPhoto: UIViewRepresentable {
+    let photo: UIImage
+
+    func makeUIView(context: Context) -> UIScrollView {
+        let scroll = UIScrollView()
+        scroll.maximumZoomScale = 5
+        scroll.showsVerticalScrollIndicator = false
+        scroll.showsHorizontalScrollIndicator = false
+        scroll.delegate = context.coordinator
+
+        let image = context.coordinator.image
+        image.contentMode = .scaleAspectFit
+        image.translatesAutoresizingMaskIntoConstraints = false
+        scroll.addSubview(image)
+        NSLayoutConstraint.activate([
+            image.leadingAnchor.constraint(equalTo: scroll.contentLayoutGuide.leadingAnchor),
+            image.topAnchor.constraint(equalTo: scroll.contentLayoutGuide.topAnchor),
+            image.trailingAnchor.constraint(equalTo: scroll.contentLayoutGuide.trailingAnchor),
+            image.bottomAnchor.constraint(equalTo: scroll.contentLayoutGuide.bottomAnchor),
+            image.widthAnchor.constraint(equalTo: scroll.frameLayoutGuide.widthAnchor),
+            image.heightAnchor.constraint(equalTo: scroll.frameLayoutGuide.heightAnchor),
+        ])
+        return scroll
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator() }
+
+    func updateUIView(_ scroll: UIScrollView, context: Context) {
+        context.coordinator.image.image = photo
+    }
+
+    final class Coordinator: NSObject, UIScrollViewDelegate {
+        let image = UIImageView()
+
+        func viewForZooming(in scrollView: UIScrollView) -> UIView? { image }
     }
 }
 

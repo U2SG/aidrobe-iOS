@@ -51,7 +51,7 @@ final class TodayModel {
     private(set) var isRefreshing = false
     private(set) var generatedImages: [String: URL] = [:]
     private(set) var generatingOutfits: Set<String> = []
-    private(set) var rejectedOutfitImages: Set<String> = []
+    private(set) var outfitImageIssues: [String: String] = [:]
     /// outfit id → recommended item id → the item the user chose instead.
     private var swaps: [String: [String: String]] = [:]
     var notice: String?
@@ -187,6 +187,14 @@ final class TodayModel {
             try await displayImage(asset, for: id, reportFailure: true)
         } catch {
             if Task.isCancelled { return }
+            if (error as? APIError)?.reason == "missing_garment_reference" {
+                outfitImageIssues[id] = userMessage(for: error)
+                return
+            }
+            if (error as? APIError)?.status == 429 {
+                notice = "今天的整套图生成次数已用完"
+                return
+            }
             notice = (error as? APIError)?.isFeatureDisabled == true
                 ? "当前服务还没有开启搭配生图"
                 : userMessage(for: error)
@@ -204,17 +212,16 @@ final class TodayModel {
             case "completed":
                 if let image = asset.imageUrl.flatMap(URL.init(string:)) {
                     generatedImages[outfitID] = image
-                    rejectedOutfitImages.remove(outfitID)
+                    outfitImageIssues[outfitID] = nil
                 } else if reportFailure {
                     notice = "这套搭配图暂时打不开"
                 }
                 return
             case "rejected_by_quality_gate":
-                rejectedOutfitImages.insert(outfitID)
-                if reportFailure { notice = "整套图未通过核对，已显示单品参考图" }
+                outfitImageIssues[outfitID] = "整套图未能通过原照比对"
                 return
             case "failed":
-                if reportFailure { notice = "这次没能生成搭配图" }
+                outfitImageIssues[outfitID] = "整套图生成失败"
                 return
             default:
                 try await clock.sleep(for: .seconds(3))
