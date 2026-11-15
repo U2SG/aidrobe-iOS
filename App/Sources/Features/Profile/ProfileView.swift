@@ -93,6 +93,7 @@ struct ProfileView: View {
         }
         Section {
             NavigationLink("衣橱洞察") { InsightsView() }
+            NavigationLink("风格灵感") { StyleInspirationView() }
             NavigationLink("记住的偏好") { MemoryView() }
             NavigationLink("数据与隐私") { PrivacyView() }
         }

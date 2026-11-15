@@ -8164,7 +8164,6 @@
      "state",
      "feasible_outfit_count",
      "missing_slots",
-     "first_outfit",
      "gate_failures"
     ],
     "title": "FirstOutfitGateResponse"
@@ -8576,7 +8575,6 @@
     "type": "object",
     "required": [
      "id",
-     "image_url",
      "source_type",
      "created_at"
     ],
@@ -11048,8 +11046,6 @@
      "sense_check_id",
      "verdict",
      "reason",
-     "image_url",
-     "source_url",
      "similar_items",
      "wardrobe_gap",
      "outfit_potential",

@@ -48,6 +48,7 @@ final class TodayModel {
     private(set) var favoriteOutfitIDs: Set<String> = []
     private(set) var feedbackTags: [Wire.FeedbackTagResponse] = []
     private(set) var appliedChip: ContextChip?
+    private(set) var appliedText: String?
     private(set) var isRefreshing = false
     private(set) var generatedImages: [String: URL] = [:]
     private(set) var generatingOutfits: Set<String> = []
@@ -124,17 +125,21 @@ final class TodayModel {
     }
 
     /// Asks for a fresh set, optionally for a stated situation.
-    func refresh(chip: ContextChip? = nil) async {
+    func refresh(chip: ContextChip? = nil, text: String? = nil) async throws {
         isRefreshing = true
         defer { isRefreshing = false }
-        do {
-            apply(try await api.send(Endpoints.refreshToday(chipID: chip?.id)))
-            appliedChip = chip
-            swaps = [:]
-        } catch APIError.http(status: 429, _, _, _) {
-            notice = "今天重新搭配的次数用完了"
-        } catch {
-            notice = userMessage(for: error)
+        let result = try await api.send(Endpoints.refreshToday(chipID: chip?.id, text: text))
+        apply(result)
+        appliedChip = result.appliedContext == nil ? nil : chip
+        appliedText = result.appliedContext?.overrideText
+        swaps = [:]
+    }
+
+    static func refreshMessage(_ error: any Error) -> String {
+        switch (error as? APIError)?.status {
+        case 429: "今天重新搭配的次数用完了"
+        case 422: "这次没能用上你的要求。可以换个说法，或选一个快捷选项。"
+        default: userMessage(for: error)
         }
     }
 

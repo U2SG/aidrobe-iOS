@@ -42,19 +42,17 @@ def walk(node: object) -> object:
         return [walk(item) for item in node]
     if not isinstance(node, dict):
         return node
-    node = {key: walk(value) for key, value in node.items()}
     node, _ = strip_null(node)
     properties = node.get("properties")
-    if isinstance(properties, dict):
-        nullable = set()
-        for name, prop in list(properties.items()):
-            stripped, was_nullable = strip_null(prop) if isinstance(prop, dict) else (prop, False)
-            properties[name] = stripped
-            if was_nullable:
-                nullable.add(name)
-        if nullable and isinstance(node.get("required"), list):
-            node["required"] = [name for name in node["required"] if name not in nullable]
-    return node
+    required = node.get("required")
+    if isinstance(properties, dict) and isinstance(required, list):
+        nullable = {
+            name for name, prop in properties.items()
+            if isinstance(prop, dict) and strip_null(prop)[1]
+        }
+        if nullable:
+            node["required"] = [name for name in required if name not in nullable]
+    return {key: walk(value) for key, value in node.items()}
 
 
 def render() -> str:
