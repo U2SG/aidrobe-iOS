@@ -42,8 +42,18 @@ public enum Endpoints {
         )
     }
 
-    public static func refreshToday(chipID: String? = nil) throws -> Endpoint<Wire.TodayRecommendationResponse> {
-        let override = chipID.map { Wire.ContextOverrideRequest(source: "chip", chipId: $0) }
+    public static let todayContextTextLimit = 200
+
+    public static func refreshToday(
+        chipID: String? = nil, text: String? = nil
+    ) throws -> Endpoint<Wire.TodayRecommendationResponse> {
+        let cleaned = text?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let override: Wire.ContextOverrideRequest?
+        if let cleaned, !cleaned.isEmpty {
+            override = .init(text: cleaned, source: "free_text")
+        } else {
+            override = chipID.map { .init(source: "chip", chipId: $0) }
+        }
         return try Endpoint(
             .post,
             "/v1/recommendations/today/refresh",
@@ -54,6 +64,18 @@ public enum Endpoints {
 
     public static func replacements(outfitID: String, itemID: String) -> Endpoint<Wire.ReplacementCandidatesResponse> {
         Endpoint(.get, "/v1/recommendations/outfits/\(outfitID)/items/\(itemID)/replacements")
+    }
+
+    public static func reviseOutfit(
+        outfitID: String, itemID: String, replacementItemID: String, requestID: String
+    ) throws -> Endpoint<Wire.StylingResponse> {
+        try Endpoint(
+            .post,
+            "/v1/recommendations/outfits/\(outfitID)/revisions",
+            json: Wire.ReviseOutfitRequest(
+                itemId: itemID, replacementItemId: replacementItemID, requestId: requestID
+            )
+        )
     }
 
     public static func setFavorite(_ favorite: Bool, outfitID: String) -> Endpoint<EmptyResponse> {

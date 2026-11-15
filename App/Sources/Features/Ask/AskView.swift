@@ -27,22 +27,56 @@ struct AskView<Tools: View>: View {
         .background(Color.background)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: String.self) { ItemDetailView(itemID: $0) }
-        .task {
-            if model == nil { model = AskModel(api: app.api, wardrobe: app.wardrobe) }
+        .task(id: app.stylingChange) {
+            if model == nil {
+                model = AskModel(
+                    api: app.api, wardrobe: app.wardrobe, bookmark: app.conversationBookmark,
+                    onRevision: app.stylingDidChange
+                )
+            }
+            if let outfit = app.outfitToDiscuss {
+                model?.beginDesign(from: outfit)
+                app.outfitToDiscuss = nil
+            }
             await model?.load()
         }
     }
 
     private func page(_ model: AskModel) -> some View {
         @Bindable var model = model
+        @Bindable var actions = model.outfitActions
         return ScrollViewReader { proxy in
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     header(model)
+                    if let base = model.baseOutfit, model.entries.isEmpty {
+                        VStack(alignment: .leading, spacing: Spacing.control) {
+                            SectionHeading(title: "从这一套接着聊")
+                            Text(base.title).font(.display(22, relativeTo: .title2))
+                            OutfitBoard(items: model.outfitActions.boardItems(for: base))
+                            Text("想保留哪件，或者哪里想调整？")
+                                .font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                        }
+                    }
+                    if model.isRestoring { ProgressView("正在取回这段对话…") }
+                    if let failure = model.restorationFailure {
+                        VStack(alignment: .leading, spacing: Spacing.tight) {
+                            Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                            if model.canRetryRestore {
+                                Button("重新读取") { Task { await model.retryRestore() } }
+                                    .buttonStyle(.glass)
+                                    .disabled(model.isBusy)
+                            }
+                        }
+                    }
                     ForEach(model.entries) { entry in
                         AskEntryView(entry: entry, model: model).id(entry.id)
                     }
-                    if model.entries.isEmpty { opening(model) }
+                    if let styling = model.styling {
+                        StylingCard(model: model, styling: styling)
+                            .id(styling.outfit.outfitId)
+                    }
+                    if model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil && !model.isRestoring { opening(model) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.screen)
@@ -58,17 +92,18 @@ struct AskView<Tools: View>: View {
         .safeAreaBar(edge: .bottom) { inputBar(model) }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .toast($model.notice)
+        .toast($actions.notice)
     }
 
     private func header(_ model: AskModel) -> some View {
         VStack(alignment: .leading, spacing: 6) {
             Text("问问").kicker()
             HStack(alignment: .bottom) {
-                Text(model.entries.isEmpty ? "想问衣橱什么？" : "接着问")
+                Text(model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil ? "想问衣橱什么？" : "接着问")
                     .font(.display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
                 Spacer()
-                if !model.entries.isEmpty {
+                if !model.entries.isEmpty || model.styling != nil || model.baseOutfit != nil || model.restorationFailure != nil {
                     Button {
                         Task { await model.startOver() }
                     } label: {
@@ -77,11 +112,11 @@ struct AskView<Tools: View>: View {
                     }
                     .buttonStyle(.glass)
                     .buttonBorderShape(.circle)
-                    .disabled(model.isAsking)
+                    .disabled(model.isBusy)
                     .accessibilityLabel("新对话")
                 }
             }
-            if model.entries.isEmpty {
+            if model.entries.isEmpty && model.styling == nil && model.baseOutfit == nil {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
@@ -106,7 +141,7 @@ struct AskView<Tools: View>: View {
                     .padding(.bottom, 4)
                 ForEach(model.earlier.prefix(8), id: \.askSessionId) { item in
                     Button {
-                        model.reopen(item)
+                        Task { await model.reopen(item) }
                     } label: {
                         HStack(spacing: Spacing.row) {
                             Text(item.question)
@@ -122,6 +157,7 @@ struct AskView<Tools: View>: View {
                         .contentShape(.rect)
                     }
                     .buttonStyle(.plain)
+                    .disabled(model.isBusy)
                     Divider().overlay(Color.separator)
                 }
             }
@@ -138,7 +174,7 @@ struct AskView<Tools: View>: View {
     private func inputBar(_ model: AskModel) -> some View {
         GlassEffectContainer(spacing: Spacing.tight) {
             HStack(alignment: .bottom, spacing: Spacing.tight) {
-                TextField("问一个穿搭问题", text: $draft, axis: .vertical)
+                TextField("说说想法，或调整这一套", text: $draft, axis: .vertical)
                     .lineLimit(1...4)
                     .focused($isTyping)
                     .submitLabel(.send)
@@ -150,7 +186,7 @@ struct AskView<Tools: View>: View {
                     send(draft, model)
                 } label: {
                     Group {
-                        if model.isAsking {
+                        if model.isBusy {
                             ProgressView()
                         } else {
                             Image(systemName: "arrow.up").fontWeight(.semibold)
@@ -161,7 +197,7 @@ struct AskView<Tools: View>: View {
                 .buttonStyle(.glassProminent)
                 .buttonBorderShape(.circle)
                 .controlSize(.large)
-                .disabled(model.isAsking || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                .disabled(model.isBusy || model.needsLatestVersion || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                 .accessibilityLabel("发送")
             }
         }
@@ -170,7 +206,7 @@ struct AskView<Tools: View>: View {
     }
 
     private func send(_ question: String, _ model: AskModel) {
-        guard !model.isAsking else { return }
+        guard !model.isBusy, !model.needsLatestVersion else { return }
         draft = ""
         isTyping = false
         Task { await model.ask(question) }
@@ -180,6 +216,209 @@ struct AskView<Tools: View>: View {
 extension AskView where Tools == EmptyView {
     init() {
         self.init { EmptyView() }
+    }
+}
+
+private struct StylingSwapTarget: Identifiable {
+    let outfit: Wire.OutfitResponse
+    let item: BoardItem
+    var id: String { outfit.outfitId + item.itemID }
+}
+
+/// A saved outfit is the working result. The conversation can keep changing
+/// while image work finishes against its own immutable outfit identifier.
+private struct StylingCard: View {
+    let model: AskModel
+    let styling: Wire.StylingResponse
+    @State private var swapTarget: StylingSwapTarget?
+    @State private var showPieces = false
+
+    private var outfit: Wire.OutfitResponse { styling.outfit }
+    private var actions: TodayModel { model.outfitActions }
+    private var adoptionTitle: String {
+        if styling.status == .adopted {
+            if let day = styling.recommendationDate, day != JournalDay.today {
+                return "已安排在\(Garment.day(day) ?? day)"
+            }
+            return "已放到今日"
+        }
+        if let day = styling.constraints.targetDate, day != JournalDay.today {
+            return "安排在\(Garment.day(day) ?? day)"
+        }
+        return "就这套，放到今日"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.row) {
+            SectionHeading(title: "这一套")
+            HStack(alignment: .firstTextBaseline) {
+                Text(outfit.title)
+                    .font(.display(24, relativeTo: .title2))
+                    .foregroundStyle(Color.label)
+                Spacer(minLength: Spacing.tight)
+                Text("第\(styling.revision)版")
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(Color.tertiaryLabel)
+            }
+            if !showPieces, let image = actions.generatedImages[outfit.outfitId] {
+                GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
+                    .accessibilityHidden(false)
+                    .accessibilityLabel("当前搭配的整套效果图")
+            } else {
+                OutfitBoard(items: actions.boardItems(for: outfit)) { item in
+                    openReplacement(item)
+                }
+            }
+            imageAction
+            Text(outfit.reason)
+                .font(.body)
+                .foregroundStyle(Color.secondaryLabel)
+            conditions
+            pieces
+            if model.isUpdatingDesign { ProgressView("正在保存修改…") }
+            if let failure = model.actionFailure {
+                Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                if model.canRetryAction {
+                    Button("重试刚才的操作") { Task { await model.retryDesignAction() } }
+                        .buttonStyle(.glass)
+                        .disabled(model.isBusy || model.needsLatestVersion)
+                }
+            }
+            HStack(spacing: Spacing.control) {
+                Button {
+                    Task { await model.adopt() }
+                } label: {
+                    Text(adoptionTitle)
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(model.isBusy || model.needsLatestVersion || styling.status == .adopted)
+                Menu {
+                    Button(
+                        actions.favoriteOutfitIDs.contains(outfit.outfitId) ? "取消收藏" : "收藏这套",
+                        systemImage: "heart"
+                    ) { Task { await actions.toggleFavorite(outfit) } }
+                    if styling.status == .adopted, styling.recommendationDate == JournalDay.today {
+                        Button(
+                            actions.wornOutfitIDs.contains(outfit.outfitId) ? "已记录穿着" : "今天穿了这套",
+                            systemImage: "checkmark"
+                        ) { Task { await actions.markWorn(outfit) } }
+                        .disabled(actions.wornOutfitIDs.contains(outfit.outfitId))
+                    }
+                } label: {
+                    Image(systemName: "ellipsis").frame(width: 44, height: 44)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .disabled(model.isBusy)
+                .accessibilityLabel("这套搭配的操作")
+            }
+        }
+        .task(id: outfit.outfitId) { await actions.loadGeneratedImage(for: outfit.outfitId) }
+        .sheet(item: $swapTarget) { target in
+            SwapSheet(
+                outfit: target.outfit, slot: target.item, model: actions,
+                onRevision: model.acceptRevision, onConflict: { await model.restoreCurrent() }
+            )
+        }
+    }
+
+    @ViewBuilder private var imageAction: some View {
+        let id = outfit.outfitId
+        if actions.generatedImages[id] != nil {
+            Button(showPieces ? "看整套效果" : "看单品拼图") { showPieces.toggle() }
+                .font(.footnote)
+        } else if actions.generatingOutfits.contains(id) {
+            ProgressView("正在准备整套图…").font(.footnote)
+        } else {
+            if let issue = actions.outfitImageIssues[id] {
+                Text(issue).font(.footnote).foregroundStyle(Color.secondaryLabel)
+            }
+            Button("看一下整套效果", systemImage: "sparkles") {
+                Task { await actions.generateImage(for: outfit) }
+            }
+            .buttonStyle(.glass)
+            .disabled(model.isBusy)
+        }
+    }
+
+    @ViewBuilder private var conditions: some View {
+        let constraints = styling.constraints
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            if let day = constraints.targetDate, let date = Garment.day(day) {
+                Text("准备在\(date)穿")
+            }
+            if let goal = constraints.goal, !goal.isEmpty {
+                Text("这次想要：\(goal)")
+            }
+            if let style = constraints.targetStyle, !style.isEmpty, style != constraints.goal {
+                Text("想尝试：\(style)")
+            }
+            if constraints.exploration == true {
+                Text("这是本次尝试，不会自动改掉长期偏好。")
+            }
+            ForEach(Array((constraints.notes ?? []).enumerated()), id: \.offset) { _, note in
+                Text(note)
+            }
+            if !model.excludedItemIDs.isEmpty {
+                Text("这次不用")
+                    .foregroundStyle(Color.tertiaryLabel)
+                FlowLayout {
+                    ForEach(model.excludedItemIDs, id: \.self) { id in
+                        Button {
+                            Task { await model.removeExclusion(id) }
+                        } label: {
+                            Label(model.itemName(id), systemImage: "xmark")
+                        }
+                        .buttonStyle(.bordered)
+                        .disabled(model.isBusy || model.needsLatestVersion)
+                        .accessibilityLabel("取消本次排除：\(model.itemName(id))")
+                    }
+                }
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(Color.secondaryLabel)
+    }
+
+    private var pieces: some View {
+        VStack(spacing: 0) {
+            ForEach(actions.boardItems(for: outfit)) { item in
+                let locked = model.lockedItemIDs.contains(item.itemID)
+                HStack(spacing: Spacing.control) {
+                    Text(Garment.category(item.role))
+                        .font(.caption)
+                        .foregroundStyle(Color.tertiaryLabel)
+                        .frame(width: 48, alignment: .leading)
+                    Text(item.name)
+                        .font(.subheadline)
+                        .foregroundStyle(Color.label)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    Menu {
+                        Button("换一件", systemImage: "arrow.triangle.2.circlepath") { openReplacement(item) }
+                            .disabled(locked)
+                        Button(locked ? "取消保留" : "保留这件", systemImage: locked ? "lock.open" : "lock") {
+                            Task { await model.toggleLock(item.itemID) }
+                        }
+                    } label: {
+                        Label(locked ? "已保留" : "调整", systemImage: locked ? "lock" : "ellipsis")
+                            .font(.subheadline)
+                            .frame(minHeight: 44)
+                    }
+                    .disabled(model.isBusy || model.needsLatestVersion)
+                    .accessibilityLabel("调整\(item.name)")
+                }
+                Divider().overlay(Color.separator)
+            }
+        }
+    }
+
+    private func openReplacement(_ item: BoardItem) {
+        guard !model.isBusy, !model.needsLatestVersion else { return }
+        if model.lockedItemIDs.contains(item.itemID) {
+            model.notice = "这件已经保留。取消保留后，可以再换一件。"
+        } else { swapTarget = StylingSwapTarget(outfit: outfit, item: item) }
     }
 }
 
@@ -208,14 +447,22 @@ private struct AskEntryView: View {
                     .foregroundStyle(Color.secondaryLabel)
                     .lineSpacing(4)
                     .textSelection(.enabled)
-                if !garments.isEmpty { garmentRow(garments) }
-                feedback
+                if let styling = entry.styling {
+                    Text("第\(styling.revision)版搭配")
+                        .font(.caption)
+                        .foregroundStyle(Color.tertiaryLabel)
+                    if styling.outfit.outfitId != model.styling?.outfit.outfitId, !garments.isEmpty {
+                        garmentRow(garments)
+                    }
+                } else if !garments.isEmpty { garmentRow(garments) }
+                if model.canGiveFeedback(entry) { feedback }
             case .unavailable:
                 note("问问暂时还答不了。开通后，这里会用你衣橱里的衣服来回答。")
             case let .failed(message):
                 note(message)
                 Button("再问一次") { Task { await model.retry(entry) } }
                     .buttonStyle(.glass)
+                    .disabled(model.isBusy || model.needsLatestVersion)
             }
         }
     }

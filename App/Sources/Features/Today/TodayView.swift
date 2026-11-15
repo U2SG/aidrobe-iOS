@@ -39,8 +39,8 @@ struct TodayView: View {
             if let sky = model?.sky { WeatherLight(visual: sky) }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .task {
-            if model == nil { model = TodayModel(api: app.api, wardrobe: app.wardrobe) }
+        .task(id: app.todayChange) {
+            if model == nil { model = TodayModel(api: app.api, wardrobe: app.wardrobe, onRevision: app.stylingDidChange) }
             await model?.load()
         }
     }
@@ -96,6 +96,7 @@ private struct SwapTarget: Identifiable {
 
 private struct TodayPage: View {
     let model: TodayModel
+    @Environment(AppModel.self) private var app
     @State private var currentID: String?
     @State private var swapTarget: SwapTarget?
     @State private var feedbackOutfit: Wire.OutfitResponse?
@@ -154,6 +155,7 @@ private struct TodayPage: View {
         }
         .sensoryFeedback(.success, trigger: model.wornOutfitIDs)
         .sensoryFeedback(.selection, trigger: currentID)
+        .onChange(of: model.revisedOutfitID) { currentID = model.revisedOutfitID }
     }
 
     // MARK: Header
@@ -178,6 +180,13 @@ private struct TodayPage: View {
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
+            if model.needsLatestVersion {
+                Text("这套已经有新修改，读取最新搭配后可以继续调整。")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondaryLabel)
+                Button("读取最新搭配") { Task { await model.load() } }
+                    .buttonStyle(.glass)
+            }
         }
     }
 
@@ -194,7 +203,9 @@ private struct TodayPage: View {
             }
             if let place = weather.locationName { parts.append(place) }
         }
-        if let chip = model.appliedChip { parts.append("已按「\(chip.title)」搭配") }
+        if let context = model.appliedText ?? model.appliedChip?.title {
+            parts.append("已按「\(context)」搭配")
+        }
         return parts.isEmpty ? nil : parts.joined(separator: " · ")
     }
 
@@ -205,9 +216,8 @@ private struct TodayPage: View {
             LazyHStack(spacing: Spacing.control) {
                 ForEach(model.outfits) { outfit in
                     let items = model.boardItems(for: outfit)
-                    let hasSwaps = items.contains(where: \.isSwapped)
                     VStack(alignment: .leading, spacing: Spacing.tight) {
-                        outfitPreview(outfit, items: items, hasSwaps: hasSwaps)
+                        outfitPreview(outfit, items: items)
                             .overlay(alignment: .topTrailing) {
                                 HStack(spacing: 0) {
                                     Button {
@@ -227,7 +237,7 @@ private struct TodayPage: View {
                                 }
                             }
 
-                        if !hasSwaps { outfitImageActions(outfit) }
+                        outfitImageActions(outfit)
                     }
                     .containerRelativeFrame(.horizontal)
                 }
@@ -241,13 +251,14 @@ private struct TodayPage: View {
     }
 
     @ViewBuilder
-    private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem], hasSwaps: Bool) -> some View {
-        if !hasSwaps, !showPieces.contains(outfit.outfitId), let image = model.generatedImages[outfit.outfitId] {
+    private func outfitPreview(_ outfit: Wire.OutfitResponse, items: [BoardItem]) -> some View {
+        if !showPieces.contains(outfit.outfitId), let image = model.generatedImages[outfit.outfitId] {
             GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                 .accessibilityHidden(false)
                 .accessibilityLabel("AI 生成的整套搭配图")
         } else {
             OutfitBoard(items: items) { slot in
+                guard !model.needsLatestVersion, !model.isRevising, !model.isRefreshing else { return }
                 swapTarget = SwapTarget(outfit: outfit, slot: slot)
             }
         }
@@ -312,6 +323,10 @@ private struct TodayPage: View {
             Text(outfit.reason)
                 .font(.body)
                 .foregroundStyle(Color.secondaryLabel)
+            Button("聊聊这套", systemImage: "text.bubble") { app.discussOutfit(outfit) }
+                .font(.subheadline)
+                .frame(minHeight: 44)
+                .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
         }
     }
 
@@ -335,14 +350,15 @@ private struct TodayPage: View {
                             .foregroundStyle(Color.label)
                             .lineLimit(1)
                         Spacer(minLength: Spacing.tight)
-                        Text(item.isSwapped ? "已换" : "换一件")
+                        Text("换一件")
                             .font(.subheadline)
-                            .foregroundStyle(item.isSwapped ? Color.accent : Color.tertiaryLabel)
+                            .foregroundStyle(Color.tertiaryLabel)
                     }
                     .frame(minHeight: 48)
                     .contentShape(.rect)
                 }
                 .buttonStyle(.plain)
+                .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
                 Divider().overlay(Color.separator)
             }
         }
@@ -453,8 +469,12 @@ private struct TodayPage: View {
     private func another() async {
         let outfits = model.outfits
         guard outfits.count > 1, let index = outfits.firstIndex(where: { $0.outfitId == outfit.outfitId }) else {
-            await model.refresh(chip: model.appliedChip)
-            currentID = model.outfits.first?.outfitId
+            do {
+                try await model.refresh(chip: model.appliedChip, text: model.appliedText)
+                currentID = model.outfits.first?.outfitId
+            } catch {
+                model.notice = TodayModel.refreshMessage(error)
+            }
             return
         }
         withAnimation { currentID = outfits[(index + 1) % outfits.count].outfitId }

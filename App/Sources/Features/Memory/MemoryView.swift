@@ -94,6 +94,9 @@ struct MemoryView: View {
                             Text(MemoryCopy.sentence(for: entry))
                                 .font(.body)
                                 .foregroundStyle(Color.label)
+                            Text(MemoryCopy.scope(for: entry))
+                                .font(.caption)
+                                .foregroundStyle(Color.secondaryLabel)
                             Text(MemoryCopy.provenance(for: entry))
                                 .font(.caption)
                                 .foregroundStyle(Color.tertiaryLabel)
@@ -152,6 +155,12 @@ enum MemoryCopy {
     /// The backend writes each preference as a sentence.
     static func sentence(for item: Wire.MemoryItemResponse) -> String {
         item.displayText
+    }
+
+    static func scope(for item: Wire.MemoryItemResponse) -> String {
+        let scope = item.scopeText.flatMap { $0.isEmpty ? nil : $0 } ?? "所有场合"
+        guard let expiry = item.expiresAt else { return scope }
+        return scope + " · 有效到 " + expiry.formatted(.dateTime.month().day().locale(Locale(identifier: "zh_CN")))
     }
 
     /// "来自你的反馈 · 初步 · 11月13日"
