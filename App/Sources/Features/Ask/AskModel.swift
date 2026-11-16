@@ -22,6 +22,7 @@ final class AskModel {
         }
 
         let id: UUID
+        let createdAt: Date
         let question: String
         var state: State
         var feedback: FeedbackKind?
@@ -35,11 +36,12 @@ final class AskModel {
         var needsRebase = false
 
         init(
-            id: UUID = UUID(), question: String, state: State, styling: Wire.StylingResponse? = nil,
+            id: UUID = UUID(), createdAt: Date = .now, question: String, state: State, styling: Wire.StylingResponse? = nil,
             conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil,
             inspirationID: String? = nil, inspirationOnly: Bool = false
         ) {
             self.id = id
+            self.createdAt = createdAt
             self.question = question
             self.state = state
             self.styling = styling
@@ -124,6 +126,14 @@ final class AskModel {
     var lockedItemIDs: [String] { designConstraints?.lockedItemIds ?? [] }
     var excludedItemIDs: [String] { designConstraints?.excludedItemIds ?? [] }
     var packingList: Wire.PackingListResponse? { packingListID.flatMap(packing.list) }
+    var packingAnchorEntryID: UUID? {
+        guard let list = packingList else { return nil }
+        if let createdAt = list.createdAt {
+            return entries.last { $0.createdAt <= createdAt }?.id
+        }
+        // Keep lists from servers without timestamps ahead of later turns.
+        return entries.first?.id
+    }
 
     var earlier: [Wire.AskHistoryItem] {
         let shown = Set(entries.compactMap { entry -> String? in
@@ -147,9 +157,10 @@ final class AskModel {
         }
     }
 
-    func ask(_ raw: String) async {
+    @discardableResult
+    func ask(_ raw: String) -> Bool {
         let question = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !question.isEmpty, canAsk else { return }
+        guard !question.isEmpty, canAsk else { return false }
         let inspirationID = conversationID == nil ? inspiration?.id : nil
         let entry = Entry(
             question: question, state: .asking, conversationID: conversationID,
@@ -159,7 +170,12 @@ final class AskModel {
             inspirationOnly: inspirationID != nil && raw == Self.inspirationPrompt
         )
         entries.append(entry)
-        await send(entry.id)
+        Task { await send(entry.id) }
+        return true
+    }
+
+    func hasWearFeedback(for styling: Wire.StylingResponse) -> Bool {
+        outfitActions.hasWearFeedback(outfitID: styling.outfit.outfitId)
     }
 
     private func send(_ entryID: UUID) async {
@@ -276,6 +292,7 @@ final class AskModel {
         } else {
             resetConversation()
             entries = [Entry(
+                createdAt: item.createdAt,
                 question: item.question,
                 state: .answered(
                     sessionID: item.askSessionId, text: item.answer ?? "",
@@ -316,6 +333,7 @@ final class AskModel {
                     let ids = message.itemRefs ?? message.styling?.outfit.items.map(\.itemId) ?? []
                     restored.append(Entry(
                         id: UUID(uuidString: message.id) ?? UUID(),
+                        createdAt: message.createdAt,
                         question: question ?? "调整后的搭配",
                         state: .answered(
                             sessionID: message.askSessionId, text: message.content,

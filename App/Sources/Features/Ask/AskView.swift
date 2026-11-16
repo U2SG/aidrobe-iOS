@@ -9,6 +9,7 @@ struct AskView<Tools: View>: View {
     @State private var model: AskModel?
     @State private var draft = ""
     @State private var tripSource: PackingDesignSource?
+    @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -27,6 +28,9 @@ struct AskView<Tools: View>: View {
         .background(Color.background)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: String.self) { ItemDetailView(itemID: $0) }
+        .navigationDestination(for: Wire.StylingResponse.self) { styling in
+            if let model { HistoricalStylingCard(model: model, styling: styling) }
+        }
         .navigationDestination(for: AskPackingRoute.self) { route in
             if let model {
                 PackingListDetailView(listID: route.listID, model: model.packing)
@@ -39,7 +43,12 @@ struct AskView<Tools: View>: View {
             if let model {
                 NewTripSheet(
                     model: model.packing, source: source, suggestedDays: model.tripDays,
-                    onCreated: model.didCreatePackingList
+                    onCreated: { id in
+                        model.didCreatePackingList(id)
+                        if model.packingListID == id {
+                            scrollPosition.scrollTo(id: AskScrollTarget.packingList(id), anchor: .center)
+                        }
+                    }
                 )
             }
         }
@@ -66,76 +75,88 @@ struct AskView<Tools: View>: View {
     private func page(_ model: AskModel) -> some View {
         @Bindable var model = model
         @Bindable var actions = model.outfitActions
-        return ScrollViewReader { proxy in
-            ScrollView {
-                VStack(alignment: .leading, spacing: Spacing.section) {
-                    header(model)
-                    if model.usesInspiration { inspirationReference(model) }
-                    if let base = model.baseOutfit, model.entries.isEmpty {
-                        VStack(alignment: .leading, spacing: Spacing.control) {
-                            SectionHeading(title: "从这一套接着聊")
-                            Text(base.title).font(.display(22, relativeTo: .title2))
-                            OutfitBoard(items: model.outfitActions.boardItems(for: base, useOriginalPhotoFallback: true))
-                            Text("想保留哪件，或者哪里想调整？")
-                                .font(.subheadline).foregroundStyle(Color.secondaryLabel)
-                        }
+        return ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.section) {
+                header(model)
+                if model.usesInspiration { inspirationReference(model) }
+                if let base = model.baseOutfit, model.entries.isEmpty {
+                    VStack(alignment: .leading, spacing: Spacing.control) {
+                        SectionHeading(title: "从这一套接着聊")
+                        Text(base.title).font(.display(22, relativeTo: .title2))
+                        OutfitBoard(items: model.outfitActions.boardItems(for: base, useOriginalPhotoFallback: true))
+                        Text("想保留哪件，或者哪里想调整？")
+                            .font(.subheadline).foregroundStyle(Color.secondaryLabel)
                     }
-                    if model.isRestoring { ProgressView("正在取回这段对话…") }
-                    if let failure = model.restorationFailure {
-                        VStack(alignment: .leading, spacing: Spacing.tight) {
-                            Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
-                            if model.canRetryRestore {
-                                Button("重新读取") { Task { await model.retryRestore() } }
-                                    .buttonStyle(.glass)
-                                    .disabled(model.isBusy)
-                            }
-                        }
-                    }
-                    ForEach(model.entries) { entry in
-                        AskEntryView(entry: entry, model: model).id(entry.id)
-                    }
-                    if let list = model.packingList {
-                        savedPackingList(list).id(list.packingListId)
-                    }
-                    if let styling = model.styling {
-                        StylingCard(model: model, styling: styling, onPacking: {
-                            isTyping = false
-                            tripSource = PackingDesignSource(
-                                conversationID: styling.conversationId,
-                                revision: model.expectedRevision ?? styling.revision
-                            )
-                        })
-                        .id(styling.outfit.outfitId)
-                    } else if model.designBrief != nil {
-                        VStack(alignment: .leading, spacing: Spacing.row) {
-                            SectionHeading(title: "条件已记下")
-                            DesignConditions(model: model)
-                            Text("继续聊聊，按这些条件生成方案后再采用。")
-                                .font(.subheadline)
-                                .foregroundStyle(Color.secondaryLabel)
-                        }
-                    }
-                    if !model.hasConversation && !model.isRestoring { opening(model) }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, Spacing.screen)
-                .padding(.top, Spacing.tight)
-                .padding(.bottom, Spacing.section)
+                if model.isRestoring { ProgressView("正在取回这段对话…") }
+                if let failure = model.restorationFailure {
+                    VStack(alignment: .leading, spacing: Spacing.tight) {
+                        Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                        if model.canRetryRestore {
+                            Button("重新读取") { Task { await model.retryRestore() } }
+                                .buttonStyle(.glass)
+                                .disabled(model.isBusy)
+                        }
+                    }
+                }
+                ForEach(timeline(for: model)) { item in
+                    switch item {
+                    case let .turn(entry):
+                        AskEntryView(entry: entry, model: model)
+                            .id(item.id)
+                    case let .packingList(list):
+                        savedPackingList(list)
+                            .id(item.id)
+                    }
+                }
+                if let styling = model.styling {
+                    StylingCard(model: model, styling: styling, onPacking: {
+                        isTyping = false
+                        tripSource = PackingDesignSource(
+                            conversationID: styling.conversationId,
+                            revision: model.expectedRevision ?? styling.revision
+                        )
+                    })
+                    .id(styling.outfit.outfitId)
+                } else if model.designBrief != nil {
+                    VStack(alignment: .leading, spacing: Spacing.row) {
+                        SectionHeading(title: "条件已记下")
+                        DesignConditions(model: model)
+                        Text("继续聊聊，按这些条件生成方案后再采用。")
+                            .font(.subheadline)
+                            .foregroundStyle(Color.secondaryLabel)
+                    }
+                }
+                if !model.hasConversation && !model.isRestoring { opening(model) }
             }
-            .scrollDismissesKeyboard(.interactively)
-            .onChange(of: model.entries.count) {
-                guard let last = model.entries.last else { return }
-                withAnimation { proxy.scrollTo(last.id, anchor: .top) }
-            }
-            .onChange(of: model.packingListID) {
-                guard let id = model.packingListID else { return }
-                withAnimation { proxy.scrollTo(id, anchor: .center) }
+            .scrollTargetLayout()
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, Spacing.screen)
+            .padding(.top, Spacing.tight)
+            .padding(.bottom, Spacing.section)
+        }
+        .scrollPosition($scrollPosition)
+        .scrollDismissesKeyboard(.interactively)
+        .onChange(of: model.entries.last?.id, initial: true) { _, id in
+            if let id {
+                scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
         }
         .safeAreaBar(edge: .bottom) { inputBar(model) }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .toast($model.notice)
         .toast($actions.notice)
+    }
+
+    private func timeline(for model: AskModel) -> [AskTimelineItem] {
+        var items = model.entries.map(AskTimelineItem.turn)
+        if let list = model.packingList {
+            let anchor = model.packingAnchorEntryID.flatMap { id in
+                model.entries.firstIndex { $0.id == id }
+            }
+            items.insert(.packingList(list), at: anchor.map { $0 + 1 } ?? 0)
+        }
+        return items
     }
 
     private func header(_ model: AskModel) -> some View {
@@ -294,10 +315,9 @@ struct AskView<Tools: View>: View {
     }
 
     private func send(_ question: String, _ model: AskModel) {
-        guard model.canAsk else { return }
-        draft = ""
+        guard model.ask(question) else { return }
+        if draft == question { draft = "" }
         isTyping = false
-        Task { await model.ask(question) }
     }
 }
 
@@ -309,6 +329,23 @@ extension AskView where Tools == EmptyView {
 
 private struct AskPackingRoute: Hashable {
     let listID: String
+}
+
+private enum AskScrollTarget: Hashable, Sendable {
+    case turn(UUID)
+    case packingList(String)
+}
+
+private enum AskTimelineItem: Identifiable {
+    case turn(AskModel.Entry)
+    case packingList(Wire.PackingListResponse)
+
+    var id: AskScrollTarget {
+        switch self {
+        case let .turn(entry): .turn(entry.id)
+        case let .packingList(list): .packingList(list.packingListId)
+        }
+    }
 }
 
 private struct StylingSwapTarget: Identifiable {
@@ -362,6 +399,7 @@ private struct StylingCard: View {
                 .buttonStyle(.glass)
                 .controlSize(.large)
                 .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate)
+            WearFeedbackButton(model: model, styling: styling)
             if !showPieces, let image = actions.generatedImages[outfit.outfitId] {
                 GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                     .accessibilityHidden(false)
@@ -485,6 +523,54 @@ private struct StylingCard: View {
     }
 }
 
+private struct HistoricalStylingCard: View {
+    let model: AskModel
+    let styling: Wire.StylingResponse
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                Text(styling.outfit.title)
+                    .font(.display(24, relativeTo: .title2))
+                    .foregroundStyle(Color.label)
+                WearFeedbackButton(model: model, styling: styling)
+                OutfitBoard(items: model.outfitActions.boardItems(
+                    for: styling.outfit, useOriginalPhotoFallback: true
+                ))
+                Text(styling.outfit.reason)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.screen)
+        }
+        .background(Color.background)
+        .navigationTitle("第\(styling.revision)版搭配")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
+    }
+}
+
+private struct WearFeedbackButton: View {
+    let model: AskModel
+    let styling: Wire.StylingResponse
+    @State private var isOpen = false
+
+    var body: some View {
+        Button(
+            model.hasWearFeedback(for: styling) ? "修改穿着感受" : "记录穿着感受",
+            systemImage: "square.and.pencil"
+        ) {
+            isOpen = true
+        }
+        .buttonStyle(.glass)
+        .controlSize(.large)
+        .accessibilityIdentifier("ask.wearFeedback")
+        .sheet(isPresented: $isOpen) {
+            DesignFeedbackSheet(styling: styling, model: model)
+        }
+    }
+}
+
 private struct DesignConditions: View {
     let model: AskModel
 
@@ -560,9 +646,13 @@ private struct AskEntryView: View {
                     .lineSpacing(4)
                     .textSelection(.enabled)
                 if let styling = entry.styling {
-                    Text("第\(styling.revision)版搭配")
-                        .font(.caption)
-                        .foregroundStyle(Color.tertiaryLabel)
+                    NavigationLink(value: styling) {
+                        Label("查看第\(styling.revision)版搭配", systemImage: "square.stack")
+                            .font(.subheadline)
+                            .frame(minHeight: 44)
+                            .contentShape(.rect)
+                    }
+                    .accessibilityIdentifier("ask.stylingRevision.\(styling.revision)")
                     if styling.outfit.outfitId != model.styling?.outfit.outfitId, !garments.isEmpty {
                         garmentRow(garments)
                     }

@@ -43,6 +43,7 @@ final class TodayModel {
     private(set) var today: Wire.TodayRecommendationResponse?
     private(set) var wornOutfitIDs: Set<String> = []
     private(set) var feedbackByOutfit: [String: FeedbackKind] = [:]
+    private var wearFeedbackOutfitIDs: Set<String> = []
     private(set) var favoriteOutfitIDs: Set<String> = []
     private(set) var feedbackTags: [Wire.FeedbackTagResponse] = []
     private(set) var appliedChip: ContextChip?
@@ -132,9 +133,7 @@ final class TodayModel {
             if today == nil { phase = .failed(userMessage(for: error)) }
             else if needsLatestVersion { notice = "没能读取最新搭配，请再试一次。已保存的版本仍然保留。" }
         }
-        if feedbackTags.isEmpty {
-            feedbackTags = (try? await api.send(Endpoints.feedbackTags()).tags) ?? []
-        }
+        try? await loadFeedbackTags()
     }
 
     /// Asks for a fresh set, optionally for a stated situation.
@@ -345,6 +344,35 @@ final class TodayModel {
             notice = userMessage(for: error)
             return false
         }
+    }
+
+    func loadFeedbackTags() async throws {
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        guard feedbackTags.isEmpty else { return }
+        let loaded = try await api.send(Endpoints.feedbackTags())
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        feedbackTags = loaded.tags
+    }
+
+    func hasWearFeedback(outfitID: String) -> Bool {
+        wearFeedbackOutfitIDs.contains(outfitID)
+    }
+
+    @discardableResult
+    func loadWearFeedback(outfitID: String) async throws -> Wire.WearFeedbackRecord? {
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        let snapshot = try await api.send(Endpoints.wearFeedback(outfitID: outfitID))
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        if snapshot.feedback != nil { wearFeedbackOutfitIDs.insert(outfitID) }
+        return snapshot.feedback
+    }
+
+    func saveWearFeedback(outfitID: String, feedback: Wire.WearFeedbackRecord) async throws {
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        let snapshot = try await api.send(Endpoints.saveWearFeedback(outfitID: outfitID, feedback: feedback))
+        guard accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+        if snapshot.feedback != nil { wearFeedbackOutfitIDs.insert(outfitID) }
+        notice = "已记下这版的穿着感受"
     }
 }
 

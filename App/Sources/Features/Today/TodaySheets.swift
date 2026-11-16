@@ -138,19 +138,11 @@ struct FeedbackSheet: View {
     @State private var isSending = false
     @State private var errorMessage: String?
 
-    private static let positiveKeys: Set<String> = ["complimented", "comfortable", "confident"]
-
     init(outfit: Wire.OutfitResponse, model: TodayModel) {
         self.outfit = outfit
         self.model = model
         // Opened before wearing means "not this one"; after wearing, start neutral-positive.
         _kind = State(initialValue: model.wornOutfitIDs.contains(outfit.outfitId) ? .like : .dislike)
-    }
-
-    private var tags: [Wire.FeedbackTagResponse] {
-        model.feedbackTags.filter {
-            $0.appliesTo.contains(.overall) && Self.positiveKeys.contains($0.key) == (kind == .like)
-        }
     }
 
     var body: some View {
@@ -167,18 +159,7 @@ struct FeedbackSheet: View {
                 Text("不太合适").tag(FeedbackKind.dislike)
             }
             .pickerStyle(.segmented)
-            VStack(alignment: .leading, spacing: Spacing.control) {
-                FlowLayout {
-                    ForEach(tags, id: \.key) { tag in
-                        Chip(title: tag.labelZhCn, isSelected: selected.contains(tag.key)) {
-                            selected.formSymmetricDifference([tag.key])
-                        }
-                    }
-                }
-                Text(selected.isEmpty ? "可选原因，帮助调整下一次搭配。" : "已选 \(selected.count) 项原因")
-                    .font(.footnote)
-                    .foregroundStyle(Color.tertiaryLabel)
-            }
+            FeedbackReasons(tags: model.feedbackTags, kind: kind, selected: $selected)
             if let errorMessage {
                 Text(errorMessage).font(.footnote).foregroundStyle(Color.danger)
             }
@@ -209,6 +190,167 @@ struct FeedbackSheet: View {
         .presentationBackground(Color.background)
         .disabled(isSending)
         .interactiveDismissDisabled(isSending)
+    }
+}
+
+private struct FeedbackReasons: View {
+    let tags: [Wire.FeedbackTagResponse]
+    let kind: FeedbackKind
+    @Binding var selected: Set<String>
+
+    private static let positiveKeys: Set<String> = ["complimented", "comfortable", "confident"]
+
+    var body: some View {
+        let matchingTags = tags.filter {
+            $0.appliesTo.contains(.overall) && (Self.positiveKeys.contains($0.key) == (kind == .like) ||
+                selected.contains($0.key))
+        }
+        VStack(alignment: .leading, spacing: Spacing.control) {
+            FlowLayout {
+                ForEach(matchingTags, id: \.key) { tag in
+                    Chip(title: tag.labelZhCn, isSelected: selected.contains(tag.key)) {
+                        selected.formSymmetricDifference([tag.key])
+                    }
+                }
+            }
+            Text(selected.isEmpty ? "可选原因，帮助调整下一次搭配。" : "已选 \(selected.count) 项原因")
+                .font(.footnote)
+                .foregroundStyle(Color.tertiaryLabel)
+        }
+    }
+}
+
+struct DesignFeedbackSheet: View {
+    let styling: Wire.StylingResponse
+    let model: AskModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var kind: FeedbackKind?
+    @State private var selected: Set<String> = []
+    @State private var note = ""
+    @State private var isLoaded = false
+    @State private var isSaving = false
+    @State private var errorMessage: String?
+
+    private static let noteLimit = 300
+    private var outfitID: String { styling.outfit.outfitId }
+    private var cleanedNote: String { note.trimmingCharacters(in: .whitespacesAndNewlines) }
+    private var noteLength: Int { cleanedNote.unicodeScalars.count }
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.row) {
+                Text("记录穿着感受")
+                    .font(.display(26, relativeTo: .title))
+                    .foregroundStyle(Color.label)
+                Text("第\(styling.revision)版 · \(styling.outfit.title)")
+                    .font(.subheadline)
+                    .foregroundStyle(Color.secondaryLabel)
+                if isLoaded {
+                    form
+                } else if errorMessage == nil {
+                    ProgressView("正在读取穿着感受…")
+                }
+                if let errorMessage {
+                    Text(errorMessage).font(.footnote).foregroundStyle(Color.danger)
+                    if !isLoaded {
+                        Button("重新读取") { Task { await load() } }
+                            .buttonStyle(.glass)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.screen)
+        }
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) {
+            if isLoaded {
+                Button {
+                    Task { await save() }
+                } label: {
+                    Text(isSaving ? "正在保存…" : "保存穿着感受").frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(kind == nil || noteLength > Self.noteLimit)
+                .padding(.horizontal, Spacing.screen)
+                .padding(.vertical, Spacing.tight)
+                .background(Color.background)
+            }
+        }
+        .disabled(isSaving)
+        .interactiveDismissDisabled(isSaving)
+        .presentationDetents([.large])
+        .presentationDragIndicator(.visible)
+        .presentationBackground(Color.background)
+        .task { await load() }
+    }
+
+    private var form: some View {
+        VStack(alignment: .leading, spacing: Spacing.row) {
+            Picker("感受", selection: Binding(get: { kind }, set: { value in
+                guard kind != value else { return }
+                kind = value
+                selected.removeAll()
+            })) {
+                Text("挺好").tag(FeedbackKind.like)
+                Text("不太合适").tag(FeedbackKind.dislike)
+            }
+            .pickerStyle(.segmented)
+            if let kind {
+                FeedbackReasons(tags: model.outfitActions.feedbackTags, kind: kind, selected: $selected)
+            }
+            VStack(alignment: .leading, spacing: Spacing.tight) {
+                Text("具体感受（选填）").font(.subheadline.weight(.semibold))
+                TextField("在室内偏热，出门走路很舒服", text: $note, axis: .vertical)
+                    .lineLimit(3...6)
+                    .accessibilityLabel("具体感受")
+                    .padding(Spacing.control)
+                    .background(Color.elevatedBackground, in: .rect(cornerRadius: Radius.tile))
+                    .overlay(RoundedRectangle(cornerRadius: Radius.tile).strokeBorder(Color.separator))
+                Text(noteLength > Self.noteLimit ? "最多输入 300 个字符。" : "\(noteLength)/\(Self.noteLimit)")
+                    .font(.footnote)
+                    .foregroundStyle(noteLength > Self.noteLimit ? Color.danger : Color.tertiaryLabel)
+            }
+        }
+    }
+
+    private func load() async {
+        errorMessage = nil
+        do {
+            let feedback = try await model.outfitActions.loadWearFeedback(outfitID: outfitID)
+            try await model.outfitActions.loadFeedbackTags()
+            try Task.checkCancellation()
+            if let feedback {
+                kind = feedback.feedbackType == .like ? .like : .dislike
+                selected = Set(feedback.reasonTags ?? [])
+                note = feedback.note ?? ""
+            }
+            isLoaded = true
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = userMessage(for: error)
+        }
+    }
+
+    private func save() async {
+        guard let kind, noteLength <= Self.noteLimit, !isSaving else { return }
+        let feedback = Wire.WearFeedbackRecord(
+            feedbackType: kind == .like ? .like : .dislike,
+            reasonTags: selected.sorted(),
+            note: cleanedNote.isEmpty ? nil : cleanedNote
+        )
+        isSaving = true
+        errorMessage = nil
+        defer { isSaving = false }
+        do {
+            try await model.outfitActions.saveWearFeedback(outfitID: outfitID, feedback: feedback)
+            dismiss()
+        } catch is CancellationError {
+            return
+        } catch {
+            errorMessage = userMessage(for: error)
+        }
     }
 }
 
