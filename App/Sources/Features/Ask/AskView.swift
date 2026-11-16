@@ -9,6 +9,7 @@ struct AskView<Tools: View>: View {
     @Environment(AppModel.self) private var app
     @State private var model: AskModel?
     @State private var draft = ""
+    @State private var tripSource: PackingDesignSource?
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -27,6 +28,22 @@ struct AskView<Tools: View>: View {
         .background(Color.background)
         .toolbar(.hidden, for: .navigationBar)
         .navigationDestination(for: String.self) { ItemDetailView(itemID: $0) }
+        .navigationDestination(for: AskPackingRoute.self) { route in
+            if let model {
+                PackingListDetailView(listID: route.listID, model: model.packing)
+                    .toolbar(.visible, for: .navigationBar)
+            }
+        }
+        .sheet(item: $tripSource, onDismiss: {
+            Task { await model?.refreshSavedDesign() }
+        }) { source in
+            if let model {
+                NewTripSheet(
+                    model: model.packing, source: source, suggestedDays: model.tripDays,
+                    onCreated: model.didCreatePackingList
+                )
+            }
+        }
         .task(id: app.stylingChange) {
             if model == nil {
                 model = AskModel(
@@ -34,7 +51,12 @@ struct AskView<Tools: View>: View {
                     onRevision: app.stylingDidChange
                 )
             }
-            if let outfit = app.outfitToDiscuss {
+            if let inspiration = app.inspirationToDiscuss {
+                model?.beginDesign(from: inspiration)
+                app.inspirationToDiscuss = nil
+                draft = AskModel.inspirationPrompt
+                isTyping = true
+            } else if let outfit = app.outfitToDiscuss {
                 model?.beginDesign(from: outfit)
                 app.outfitToDiscuss = nil
             }
@@ -49,6 +71,7 @@ struct AskView<Tools: View>: View {
             ScrollView {
                 VStack(alignment: .leading, spacing: Spacing.section) {
                     header(model)
+                    if model.usesInspiration { inspirationReference(model) }
                     if let base = model.baseOutfit, model.entries.isEmpty {
                         VStack(alignment: .leading, spacing: Spacing.control) {
                             SectionHeading(title: "从这一套接着聊")
@@ -72,9 +95,18 @@ struct AskView<Tools: View>: View {
                     ForEach(model.entries) { entry in
                         AskEntryView(entry: entry, model: model).id(entry.id)
                     }
+                    if let list = model.packingList {
+                        savedPackingList(list).id(list.packingListId)
+                    }
                     if let styling = model.styling {
-                        StylingCard(model: model, styling: styling)
-                            .id(styling.outfit.outfitId)
+                        StylingCard(model: model, styling: styling, onPacking: {
+                            isTyping = false
+                            tripSource = PackingDesignSource(
+                                conversationID: styling.conversationId,
+                                revision: model.expectedRevision ?? styling.revision
+                            )
+                        })
+                        .id(styling.outfit.outfitId)
                     } else if model.designBrief != nil {
                         VStack(alignment: .leading, spacing: Spacing.row) {
                             SectionHeading(title: "条件已记下")
@@ -84,7 +116,7 @@ struct AskView<Tools: View>: View {
                                 .foregroundStyle(Color.secondaryLabel)
                         }
                     }
-                    if model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil && !model.isRestoring { opening(model) }
+                    if !model.hasConversation && !model.isRestoring { opening(model) }
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .padding(.horizontal, Spacing.screen)
@@ -96,6 +128,10 @@ struct AskView<Tools: View>: View {
                 guard let last = model.entries.last else { return }
                 withAnimation { proxy.scrollTo(last.id, anchor: .top) }
             }
+            .onChange(of: model.packingListID) {
+                guard let id = model.packingListID else { return }
+                withAnimation { proxy.scrollTo(id, anchor: .center) }
+            }
         }
         .safeAreaBar(edge: .bottom) { inputBar(model) }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
@@ -104,15 +140,20 @@ struct AskView<Tools: View>: View {
     }
 
     private func header(_ model: AskModel) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let title = if model.usesInspiration && model.entries.isEmpty { "从灵感开始设计" }
+        else if model.hasConversation { "接着问" }
+        else { "想问衣橱什么？" }
+        return VStack(alignment: .leading, spacing: 6) {
             Text("问问").kicker()
             HStack(alignment: .bottom) {
-                Text(model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil ? "想问衣橱什么？" : "接着问")
+                Text(title)
                     .font(.display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
                 Spacer()
-                if !model.entries.isEmpty || model.styling != nil || model.designBrief != nil || model.baseOutfit != nil || model.restorationFailure != nil {
+                if model.hasConversation || model.restorationFailure != nil {
                     Button {
+                        draft = ""
+                        isTyping = false
                         Task { await model.startOver() }
                     } label: {
                         Image(systemName: "square.and.pencil")
@@ -124,11 +165,41 @@ struct AskView<Tools: View>: View {
                     .accessibilityLabel("新对话")
                 }
             }
-            if model.entries.isEmpty && model.styling == nil && model.designBrief == nil && model.baseOutfit == nil {
+            if !model.hasConversation {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
+        }
+    }
+
+    private func inspirationReference(_ model: AskModel) -> some View {
+        HStack(spacing: Spacing.control) {
+            if let imageURL = model.inspiration?.imageUrl.flatMap(URL.init(string:)) {
+                AsyncImage(url: imageURL) { image in
+                    image.resizable().scaledToFill()
+                } placeholder: {
+                    Color.elevatedBackground
+                }
+                .frame(width: 52, height: 52)
+                .clipShape(.rect(cornerRadius: Radius.tile))
+                .accessibilityHidden(true)
+            }
+            Label("参考这张灵感图", systemImage: "photo")
+                .font(.subheadline)
+                .foregroundStyle(Color.secondaryLabel)
+        }
+    }
+
+    private func savedPackingList(_ list: Wire.PackingListResponse) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            SectionHeading(title: "已保存的打包清单")
+            NavigationLink(value: AskPackingRoute(listID: list.packingListId)) {
+                TripRow(list: list)
+            }
+            .buttonStyle(.plain)
+            .accessibilityIdentifier("ask.packingList")
+            .accessibilityHint("查看打包清单")
         }
     }
 
@@ -189,6 +260,7 @@ struct AskView<Tools: View>: View {
             GlassEffectContainer(spacing: Spacing.tight) {
                 HStack(alignment: .bottom, spacing: Spacing.tight) {
                     TextField("说说想法，或调整这一套", text: $draft, axis: .vertical)
+                        .accessibilityIdentifier("ask.message")
                         .lineLimit(1...4)
                         .focused($isTyping)
                         .submitLabel(.send)
@@ -234,6 +306,10 @@ extension AskView where Tools == EmptyView {
     }
 }
 
+private struct AskPackingRoute: Hashable {
+    let listID: String
+}
+
 private struct StylingSwapTarget: Identifiable {
     let outfit: Wire.OutfitResponse
     let item: BoardItem
@@ -245,6 +321,7 @@ private struct StylingSwapTarget: Identifiable {
 private struct StylingCard: View {
     let model: AskModel
     let styling: Wire.StylingResponse
+    let onPacking: () -> Void
     @State private var swapTarget: StylingSwapTarget?
     @State private var showPieces = false
 
@@ -280,6 +357,10 @@ private struct StylingCard: View {
                     .font(.caption.monospacedDigit())
                     .foregroundStyle(Color.tertiaryLabel)
             }
+            Button("出行打包", systemImage: "suitcase", action: onPacking)
+                .buttonStyle(.glass)
+                .controlSize(.large)
+                .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate)
             if !showPieces, let image = actions.generatedImages[outfit.outfitId] {
                 GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                     .accessibilityHidden(false)

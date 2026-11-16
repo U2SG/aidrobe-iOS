@@ -6934,6 +6934,9 @@
      "design_brief": {
       "$ref": "#/components/schemas/DesignBrief"
      },
+     "packing_list": {
+      "$ref": "#/components/schemas/PackingListResponse"
+     },
      "messages": {
       "items": {
        "$ref": "#/components/schemas/AskConversationMessage"
@@ -7084,6 +7087,17 @@
       "type": "string",
       "format": "uuid",
       "title": "Base Outfit Id"
+     },
+     "inspiration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inspiration Id"
+     },
+     "inspiration_only": {
+      "type": "boolean",
+      "title": "Inspiration Only",
+      "description": "Start a draft directly from the saved image.",
+      "default": false
      },
      "constraints": {
       "$ref": "#/components/schemas/StylingConstraints"
@@ -8264,6 +8278,21 @@
       "type": "string",
       "format": "date",
       "title": "Departure Date"
+     },
+     "conversation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Conversation Id"
+     },
+     "expected_revision": {
+      "type": "integer",
+      "minimum": 1.0,
+      "title": "Expected Revision"
+     },
+     "request_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Request Id"
      }
     },
     "type": "object",
@@ -9915,6 +9944,16 @@
      "status": {
       "type": "string",
       "title": "Status"
+     },
+     "conversation_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Conversation Id"
+     },
+     "styling_revision_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Styling Revision Id"
      },
      "plan": {
       "$ref": "#/components/schemas/PackingPlan"
@@ -11906,6 +11945,11 @@
    },
    "StylingConstraints": {
     "properties": {
+     "inspiration_id": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Inspiration Id"
+     },
      "locked_item_ids": {
       "items": {
        "type": "string",

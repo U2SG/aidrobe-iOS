@@ -11,6 +11,8 @@ struct AskGarment: Identifiable, Equatable {
 @MainActor
 @Observable
 final class AskModel {
+    static let inspirationPrompt = "参考这张图，用我的衣橱设计一套搭配。"
+
     struct Entry: Identifiable {
         enum State {
             case asking
@@ -28,11 +30,14 @@ final class AskModel {
         var conversationID: String?
         var expectedRevision: Int?
         var baseOutfitID: String?
+        var inspirationID: String?
+        var inspirationOnly: Bool
         var needsRebase = false
 
         init(
             id: UUID = UUID(), question: String, state: State, styling: Wire.StylingResponse? = nil,
-            conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil
+            conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil,
+            inspirationID: String? = nil, inspirationOnly: Bool = false
         ) {
             self.id = id
             self.question = question
@@ -42,6 +47,8 @@ final class AskModel {
             self.conversationID = conversationID
             self.expectedRevision = expectedRevision
             self.baseOutfitID = baseOutfitID
+            self.inspirationID = inspirationID
+            self.inspirationOnly = inspirationOnly
         }
     }
 
@@ -54,7 +61,10 @@ final class AskModel {
     private(set) var styling: Wire.StylingResponse?
     private(set) var designBrief: Wire.DesignBrief?
     private(set) var baseOutfit: Wire.OutfitResponse?
+    private(set) var inspiration: Wire.InspirationResponse?
     private(set) var conversationID: String?
+    private(set) var tripDays: Int?
+    private(set) var packingListID: String?
     private(set) var isRestoring = false
     private(set) var isUpdatingDesign = false
     private(set) var restorationFailure: String?
@@ -63,6 +73,7 @@ final class AskModel {
     var notice: String?
 
     let outfitActions: TodayModel
+    let packing: PackingModel
     private let api: APIClient
     private let wardrobe: WardrobeStore
     private let bookmark: ConversationBookmark?
@@ -82,13 +93,14 @@ final class AskModel {
         self.bookmark = bookmark
         self.onRevision = onRevision
         outfitActions = TodayModel(api: api, wardrobe: wardrobe, onRevision: onRevision)
+        packing = PackingModel(api: api)
     }
 
     var isAsking: Bool {
         entries.contains { if case .asking = $0.state { true } else { false } }
     }
 
-    var isBusy: Bool { isAsking || isRestoring || isUpdatingDesign || outfitActions.isRevising }
+    var isBusy: Bool { isAsking || isRestoring || isUpdatingDesign || outfitActions.isRevising || packing.isCreating }
     /// A lost first answer can already have created a server conversation. Keep
     /// its stable retry separate from any explicitly started new conversation.
     var hasUnresolvedQuestion: Bool {
@@ -103,10 +115,15 @@ final class AskModel {
     var canRetryAction: Bool { retryAction != nil && !needsLatestVersion && !needsOutfitUpdate }
     var canRetryRestore: Bool { restoringID != nil || conversationID != nil }
     var designConstraints: Wire.StylingConstraints? { designBrief?.constraints ?? styling?.constraints }
+    var usesInspiration: Bool { inspiration != nil || designConstraints?.inspirationId != nil }
+    var hasConversation: Bool {
+        !entries.isEmpty || styling != nil || designBrief != nil || baseOutfit != nil || usesInspiration
+    }
     var expectedRevision: Int? { designBrief?.revision ?? styling?.revision }
     var needsOutfitUpdate: Bool { designBrief?.needsOutfitUpdate ?? false }
     var lockedItemIDs: [String] { designConstraints?.lockedItemIds ?? [] }
     var excludedItemIDs: [String] { designConstraints?.excludedItemIds ?? [] }
+    var packingList: Wire.PackingListResponse? { packingListID.flatMap(packing.list) }
 
     var earlier: [Wire.AskHistoryItem] {
         let shown = Set(entries.compactMap { entry -> String? in
@@ -122,7 +139,7 @@ final class AskModel {
         if let loaded = try? await api.send(Endpoints.askHistory()), isCurrent(expectedEpoch) { history = loaded }
         await wardrobeLoad
         guard isCurrent(expectedEpoch), !isBusy, !Task.isCancelled else { return }
-        if baseOutfit != nil, conversationID == nil { return }
+        if baseOutfit != nil || inspiration != nil, conversationID == nil { return }
         if let saved = bookmark?.conversationID, saved != conversationID || entries.isEmpty {
             await restore(saved)
         } else if let conversationID {
@@ -133,10 +150,13 @@ final class AskModel {
     func ask(_ raw: String) async {
         let question = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !question.isEmpty, canAsk else { return }
+        let inspirationID = conversationID == nil ? inspiration?.id : nil
         let entry = Entry(
             question: question, state: .asking, conversationID: conversationID,
             expectedRevision: expectedRevision,
-            baseOutfitID: baseOutfit?.outfitId
+            baseOutfitID: baseOutfit?.outfitId,
+            inspirationID: inspirationID,
+            inspirationOnly: inspirationID != nil && raw == Self.inspirationPrompt
         )
         entries.append(entry)
         await send(entry.id)
@@ -148,7 +168,8 @@ final class AskModel {
         do {
             let answer = try await api.send(Endpoints.ask(
                 entry.question, conversationID: entry.conversationID, requestID: entry.requestID,
-                expectedRevision: entry.expectedRevision, baseOutfitID: entry.baseOutfitID
+                expectedRevision: entry.expectedRevision, baseOutfitID: entry.baseOutfitID,
+                inspirationID: entry.inspirationID, inspirationOnly: entry.inspirationOnly
             ))
             guard isCurrent(expectedEpoch), let index = entries.firstIndex(where: { $0.id == entryID }) else { return }
             entries[index].state = .answered(
@@ -158,6 +179,7 @@ final class AskModel {
             entries[index].styling = answer.styling
             baseOutfit = nil
             conversationID = answer.conversationId ?? conversationID
+            if let intent = answer.tripIntent, intent.isTrip { tripDays = intent.durationDays }
             if let result = answer.styling { acceptRevision(result) }
             acceptBrief(answer.designBrief)
             if let conversationID { bookmark?.save(conversationID) }
@@ -183,6 +205,8 @@ final class AskModel {
             entries[index].conversationID = conversationID
             entries[index].expectedRevision = expectedRevision
             entries[index].baseOutfitID = nil
+            entries[index].inspirationID = conversationID == nil ? inspiration?.id : nil
+            entries[index].inspirationOnly = entries[index].inspirationID != nil && entries[index].inspirationOnly
             entries[index].needsRebase = false
         }
         entries[index].state = .asking
@@ -203,13 +227,37 @@ final class AskModel {
         baseOutfit = outfit
     }
 
+    func beginDesign(from inspiration: Wire.InspirationResponse) {
+        resetConversation()
+        self.inspiration = inspiration
+    }
+
+    func didCreatePackingList(_ id: String) {
+        guard accountGeneration == AccountLocalData.generation, let conversationID,
+              packing.list(id)?.conversationId == conversationID else { return }
+        packingListID = id
+    }
+
+    func refreshSavedDesign() async {
+        guard !isBusy, let conversationID else { return }
+        await refreshStyling(conversationID)
+    }
+
+    private func syncPackingList(_ list: Wire.PackingListResponse?) {
+        packingListID = list?.packingListId
+        if let list { packing.receive(list) }
+    }
+
     private func resetConversation() {
         epoch = UUID()
         entries = []
         styling = nil
         designBrief = nil
         baseOutfit = nil
+        inspiration = nil
         conversationID = nil
+        tripDays = nil
+        packingListID = nil
         restoringID = nil
         restorationFailure = nil
         actionFailure = nil
@@ -251,6 +299,7 @@ final class AskModel {
 
     private func restore(_ id: String) async {
         let expectedEpoch = UUID()
+        let packingRevision = packing.listRevision
         epoch = expectedEpoch
         isRestoring = true
         restoringID = id
@@ -279,8 +328,14 @@ final class AskModel {
             entries = restored
             conversationID = result.conversationId
             baseOutfit = nil
+            let sourceID = result.designBrief?.constraints.inspirationId ?? result.styling?.constraints.inspirationId
+            if inspiration?.id != sourceID { inspiration = nil }
             styling = result.styling
             designBrief = result.designBrief
+            tripDays = result.messages?.reversed().first { $0.tripIntent?.isTrip == true }?.tripIntent?.durationDays
+            if packingRevision == packing.listRevision || packingList?.conversationId != result.conversationId {
+                syncPackingList(result.packingList)
+            }
             if let result = result.styling {
                 outfitActions.syncOutfit(result.outfit, recommendationDate: result.recommendationDate)
             }
@@ -308,12 +363,17 @@ final class AskModel {
     /// which the user may want to retry against that new version.
     private func refreshStyling(_ id: String) async {
         let expectedEpoch = epoch
+        let previousPackingListID = packingListID
+        let packingRevision = packing.listRevision
         do {
             let result = try await api.send(Endpoints.askConversation(id))
             guard isCurrent(expectedEpoch), conversationID == id, !Task.isCancelled else { return }
             if let result = result.styling { acceptRevision(result) }
             else { styling = nil }
             acceptBrief(result.designBrief)
+            if previousPackingListID == packingListID, packingRevision == packing.listRevision {
+                syncPackingList(result.packingList)
+            }
             needsLatestVersion = false
             restorationFailure = nil
         } catch {

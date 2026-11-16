@@ -28,6 +28,7 @@ enum AppTab: Hashable { case today, wardrobe, ask, profile }
 
 struct MainTabView: View {
     @Environment(AppModel.self) private var app
+    @State private var askPath = NavigationPath()
 
     var body: some View {
         @Bindable var app = app
@@ -39,10 +40,16 @@ struct MainTabView: View {
                 NavigationStack { WardrobeView() }
             }
             Tab("问问", systemImage: "text.bubble", value: .ask) {
-                NavigationStack {
+                NavigationStack(path: $askPath) {
                     AskView {
-                        ToolLink(title: "该不该买", detail: "买之前，先看看衣橱里有没有") { ShouldIBuyView() }
-                        ToolLink(title: "出行打包", detail: "出门几天，从衣橱里带什么") { PackingListsView() }
+                        ToolLink(title: "该不该买", detail: "买之前，先看看衣橱里有没有", route: .shopping)
+                        ToolLink(title: "出行打包", detail: "出门几天，从衣橱里带什么", route: .packing)
+                    }
+                    .navigationDestination(for: AskToolRoute.self) { route in
+                        switch route {
+                        case .shopping: ShouldIBuyView()
+                        case .packing: PackingListsView()
+                        }
                     }
                 }
             }
@@ -50,20 +57,21 @@ struct MainTabView: View {
                 NavigationStack { ProfileView() }
             }
         }
+        .onChange(of: app.askNavigationChange) { askPath = NavigationPath() }
     }
 }
 
+private enum AskToolRoute: Hashable { case shopping, packing }
+
 /// A row that opens one of the tools under Ask, in the same shape as the
 /// "这一套" list on Today.
-private struct ToolLink<Destination: View>: View {
+private struct ToolLink: View {
     let title: String
     let detail: String
-    @ViewBuilder var destination: Destination
+    let route: AskToolRoute
 
     var body: some View {
-        NavigationLink {
-            destination
-        } label: {
+        NavigationLink(value: route) {
             VStack(spacing: 0) {
                 HStack(spacing: Spacing.row) {
                     VStack(alignment: .leading, spacing: 2) {

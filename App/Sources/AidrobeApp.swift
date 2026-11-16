@@ -37,9 +37,11 @@ final class AppModel {
 
     private(set) var sessionNotice: String?
     private(set) var stylingChange = UUID()
+    private(set) var askNavigationChange = UUID()
     private(set) var todayChange = UUID()
     var selectedTab: AppTab = .today
     var outfitToDiscuss: Wire.OutfitResponse?
+    var inspirationToDiscuss: Wire.InspirationResponse?
 
     var conversationBookmark: ConversationBookmark? {
         guard let accountID = ConversationBookmark.accountID(
@@ -56,7 +58,19 @@ final class AppModel {
     }
 
     func discussOutfit(_ outfit: Wire.OutfitResponse) {
+        inspirationToDiscuss = nil
         outfitToDiscuss = outfit
+        openAsk()
+    }
+
+    func discussInspiration(_ inspiration: Wire.InspirationResponse) {
+        outfitToDiscuss = nil
+        inspirationToDiscuss = inspiration
+        openAsk()
+    }
+
+    private func openAsk() {
+        askNavigationChange = UUID()
         stylingChange = UUID()
         selectedTab = .ask
     }
@@ -91,6 +105,7 @@ final class AppModel {
         wardrobe.reset()
         AccountLocalData.clear()
         outfitToDiscuss = nil
+        inspirationToDiscuss = nil
         selectedTab = .today
         onboardingCompleted = false
     }

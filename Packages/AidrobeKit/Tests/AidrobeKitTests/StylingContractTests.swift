@@ -11,6 +11,9 @@ private enum StylingFixture {
     static let request = "40000000-0000-0000-0000-000000000001"
     static let session = "50000000-0000-0000-0000-000000000001"
     static let message = "60000000-0000-0000-0000-000000000001"
+    static let inspiration = "90000000-0000-0000-0000-000000000001"
+    static let packingList = "90000000-0000-0000-0000-000000000002"
+    static let stylingRevision = "90000000-0000-0000-0000-000000000003"
 
     static func styling(revision: Int = 2, adopted: Bool = true) -> String {
         """
@@ -177,6 +180,42 @@ private actor LostStylingResponse {
         let question = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: data)
         #expect(question.expectedRevision == nil)
         #expect(question.conversationId == StylingFixture.conversation)
+    }
+
+    @Test func inspirationAndTheSavedPackingListSurviveConversationRoundTrip() async throws {
+        let ask = try Endpoints.ask(
+            "参考这张图，苏州两日怎么穿？",
+            requestID: StylingFixture.request, inspirationID: StylingFixture.inspiration
+        )
+        let question = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: #require(ask.body))
+        #expect(question.inspirationId == StylingFixture.inspiration)
+        #expect(question.conversationId == nil)
+        #expect(question.inspirationOnly != true)
+
+        let suggested = try Endpoints.ask(
+            "参考这张图，用我的衣橱设计一套搭配。",
+            requestID: StylingFixture.request, inspirationID: StylingFixture.inspiration, inspirationOnly: true
+        )
+        let suggestedQuestion = try JSONCoding.decoder.decode(Wire.AskRequest.self, from: #require(suggested.body))
+        #expect(suggestedQuestion.inspirationOnly == true)
+
+        let responseBody = """
+        {"conversation_id":"\(StylingFixture.conversation)",
+         "design_brief":{"revision":2,"constraints":{"inspiration_id":"\(StylingFixture.inspiration)"},"needs_outfit_update":false},
+         "packing_list":{"packing_list_id":"\(StylingFixture.packingList)",
+           "conversation_id":"\(StylingFixture.conversation)","styling_revision_id":"\(StylingFixture.stylingRevision)",
+           "destination":"苏州","days":2,"scenes":["casual"],"status":"draft",
+           "items":[{"item_id":"\(StylingFixture.newItem)","day":1,"packed":false,"scene":"casual"}]}}
+        """
+        let (client, _) = stylingClient { _ in (200, responseBody) }
+        let restored = try await client.send(Endpoints.askConversation(StylingFixture.conversation))
+        let list = try #require(restored.packingList)
+
+        #expect(restored.designBrief?.constraints.inspirationId == StylingFixture.inspiration)
+        #expect(list.packingListId == StylingFixture.packingList)
+        #expect(list.conversationId == restored.conversationId)
+        #expect(list.stylingRevisionId == StylingFixture.stylingRevision)
+        #expect(list.items.first?.itemId == StylingFixture.newItem)
     }
 
     @Test func conversationRestoresOrdinaryReferencesTripIntentAndConditionsWithoutAnOutfit() async throws {

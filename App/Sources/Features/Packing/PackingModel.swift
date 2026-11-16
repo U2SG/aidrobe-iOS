@@ -37,6 +37,13 @@ struct PackingPiece: Identifiable, Equatable {
     var id: String { itemID }
 }
 
+struct PackingDesignSource: Identifiable {
+    let conversationID: String
+    let revision: Int
+
+    var id: String { conversationID }
+}
+
 extension Wire.PackingListResponse {
     /// Unique garments in first-use order. The list stores one row per day a
     /// piece is worn; it counts as packed only when every row says so.
@@ -75,7 +82,7 @@ final class PackingModel {
     /// Lists with a save in flight, and lists edited since that save was sent.
     private var saving: Set<String> = []
     private var unsaved: Set<String> = []
-    private var listRevision = UUID()
+    private(set) var listRevision = UUID()
 
     private let api: APIClient
 
@@ -85,6 +92,17 @@ final class PackingModel {
 
     func list(_ id: String) -> Wire.PackingListResponse? {
         lists.first { $0.packingListId == id }
+    }
+
+    func receive(_ list: Wire.PackingListResponse) {
+        guard !saving.contains(list.packingListId) else { return }
+        listRevision = UUID()
+        if let index = lists.firstIndex(where: { $0.packingListId == list.packingListId }) {
+            lists[index] = list
+        } else {
+            lists.insert(list, at: 0)
+        }
+        phase = .loaded
     }
 
     func load() async {
@@ -105,23 +123,29 @@ final class PackingModel {
     }
 
     /// Returns the new list's id, or nil with `notice` set.
-    func create(destination: String, days: Int, departure: Date?, scenes: [String], weather: String) async -> String? {
+    func create(_ request: Wire.CreatePackingListRequest) async -> String? {
+        guard !isCreating else { return nil }
         listRevision = UUID()
         isCreating = true
         defer { isCreating = false }
-        let place = destination.trimmingCharacters(in: .whitespaces)
-        let hint = weather.trimmingCharacters(in: .whitespaces)
         do {
-            let list = try await api.send(Endpoints.createPackingList(.init(
-                destination: place.isEmpty ? nil : place,
-                days: days,
-                scenes: scenes,
-                weatherHint: hint.isEmpty ? nil : hint,
-                departureDate: departure.map(Self.calendarDay)
-            )))
-            lists.insert(list, at: 0)
-            phase = .loaded
+            let list = try await api.send(Endpoints.createPackingList(request))
+            receive(list)
             return list.packingListId
+        } catch let error as APIError where request.conversationId != nil {
+            switch (error.status, error.reason) {
+            case (422, "packing_scene_mismatch"):
+                notice = "这套搭配不适合第一天的场合。可以调整行程场合，或回到对话换一套。"
+            case (422, "packing_season_mismatch"):
+                notice = "这套搭配不适合出发时的季节。可以调整出发日期，或回到对话换一套。"
+            case (409, "packing_request_conflict"):
+                notice = "这次提交已用于另一份清单。关闭后重新排这趟行程。"
+            case (409, _):
+                notice = "这套搭配已有更新。返回对话读取最新版后，再排这趟行程。"
+            default:
+                notice = userMessage(for: error)
+            }
+            return nil
         } catch {
             notice = userMessage(for: error)
             return nil
@@ -142,7 +166,10 @@ final class PackingModel {
             unsaved.insert(listID)
             return
         }
-        defer { saving.remove(listID) }
+        defer {
+            saving.remove(listID)
+            listRevision = UUID()
+        }
         repeat {
             unsaved.remove(listID)
             guard let current = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
@@ -165,7 +192,7 @@ final class PackingModel {
     }
 
     /// `yyyy-MM-dd` in the user's calendar (a departure date is a calendar day, not an instant).
-    private static func calendarDay(_ date: Date) -> String {
+    static func calendarDay(_ date: Date) -> String {
         let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
