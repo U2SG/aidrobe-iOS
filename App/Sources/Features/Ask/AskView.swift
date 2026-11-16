@@ -1,9 +1,8 @@
 import AidrobeKit
 import SwiftUI
 
-/// Ask the wardrobe a question. Reads like a column, not a chat: each question
-/// is a headline, the answer is body text, and the garments it names are laid
-/// out beneath. `tools` is a slot under the suggestions for neighbouring
+/// Ask the wardrobe a question. Each question leads into the answer and the
+/// garments it names. `tools` is a slot under the suggestions for neighbouring
 /// entries (purchase check, packing).
 struct AskView<Tools: View>: View {
     @Environment(AppModel.self) private var app
@@ -147,7 +146,9 @@ struct AskView<Tools: View>: View {
             Text("问问").kicker()
             HStack(alignment: .bottom) {
                 Text(title)
-                    .font(.display(34, weight: .black, relativeTo: .largeTitle))
+                    .font(model.hasConversation
+                          ? .display(24, relativeTo: .title2)
+                          : .display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
                 Spacer()
                 if model.hasConversation || model.restorationFailure != nil {
@@ -542,7 +543,7 @@ private struct AskEntryView: View {
         VStack(alignment: .leading, spacing: Spacing.row) {
             Divider().overlay(Color.separator)
             Text(entry.question)
-                .font(.display(22, relativeTo: .title2))
+                .font(.body.weight(.semibold))
                 .foregroundStyle(Color.label)
             switch entry.state {
             case .asking:
@@ -631,23 +632,27 @@ private struct AskEntryView: View {
         }
     }
 
-    @ViewBuilder private var feedback: some View {
-        if let given = entry.feedback {
-            Text(given == .dislike ? "记下了，这次答得不好" : "记下了，谢谢")
-                .font(.subheadline)
-                .foregroundStyle(Color.tertiaryLabel)
-        } else {
-            HStack(spacing: Spacing.tight) {
-                Text("这个回答")
-                    .font(.subheadline)
-                    .foregroundStyle(Color.tertiaryLabel)
-                Chip(title: "有帮助", isSelected: false) {
-                    Task { await model.sendFeedback(.like, for: entry) }
-                }
-                Chip(title: "没帮上", isSelected: false) {
-                    Task { await model.sendFeedback(.dislike, for: entry) }
-                }
-            }
+    private var feedback: some View {
+        HStack(spacing: 0) {
+            feedbackButton(.like, title: "有帮助", symbol: "hand.thumbsup")
+            feedbackButton(.dislike, title: "没帮上", symbol: "hand.thumbsdown")
         }
+    }
+
+    private func feedbackButton(_ kind: FeedbackKind, title: String, symbol: String) -> some View {
+        let isSelected = entry.feedback == kind
+        return Button {
+            Task { await model.sendFeedback(kind, for: entry) }
+        } label: {
+            Image(systemName: isSelected ? "\(symbol).fill" : symbol)
+                .font(.subheadline)
+                .foregroundStyle(isSelected ? Color.accent : Color.secondaryLabel)
+                .frame(minWidth: 44, minHeight: 44)
+                .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .disabled(entry.feedback != nil)
+        .accessibilityLabel(title)
+        .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
