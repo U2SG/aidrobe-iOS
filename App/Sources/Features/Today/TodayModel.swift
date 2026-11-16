@@ -182,7 +182,7 @@ final class TodayModel {
 
     // MARK: Board
 
-    func boardItems(for outfit: Wire.OutfitResponse) -> [BoardItem] {
+    func boardItems(for outfit: Wire.OutfitResponse, useOriginalPhotoFallback: Bool = false) -> [BoardItem] {
         let order = ["outerwear", "top", "dress", "bottom", "shoes"]
         return outfit.items.map { slot -> BoardItem in
             let itemID = slot.itemId
@@ -190,13 +190,14 @@ final class TodayModel {
             let individualImage = item?.coverImageUrl.flatMap { cover in
                 item?.cutoutStatus == "ready" || cover != item?.originalImageUrl ? URL(string: cover) : nil
             }
+            let originalPhoto = useOriginalPhotoFallback ? item.flatMap(WardrobeStore.originalURL) : nil
             return BoardItem(
                 slotID: slot.itemId,
                 itemID: itemID,
                 role: item?.category ?? slot.category ?? "accessory",
                 name: item?.displayName ?? slot.title ?? "单品",
-                imageURL: individualImage,
-                usesGeneratedCover: item?.cutoutStatus == "ready"
+                imageURL: individualImage ?? originalPhoto,
+                usesGeneratedCover: individualImage != nil && item?.cutoutStatus == "ready"
             )
         }
         // Dressing order, so the board and the list read top to toe.

@@ -76,7 +76,7 @@ struct AskView<Tools: View>: View {
                         VStack(alignment: .leading, spacing: Spacing.control) {
                             SectionHeading(title: "从这一套接着聊")
                             Text(base.title).font(.display(22, relativeTo: .title2))
-                            OutfitBoard(items: model.outfitActions.boardItems(for: base))
+                            OutfitBoard(items: model.outfitActions.boardItems(for: base, useOriginalPhotoFallback: true))
                             Text("想保留哪件，或者哪里想调整？")
                                 .font(.subheadline).foregroundStyle(Color.secondaryLabel)
                         }
@@ -366,7 +366,7 @@ private struct StylingCard: View {
                     .accessibilityHidden(false)
                     .accessibilityLabel("当前搭配的整套效果图")
             } else {
-                OutfitBoard(items: actions.boardItems(for: outfit)) { item in
+                OutfitBoard(items: actions.boardItems(for: outfit, useOriginalPhotoFallback: true)) { item in
                     openReplacement(item)
                 }
             }
