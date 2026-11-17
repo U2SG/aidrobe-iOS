@@ -45,6 +45,7 @@ final class TodayModel {
     private(set) var feedbackByOutfit: [String: FeedbackKind] = [:]
     private var wearFeedbackOutfitIDs: Set<String> = []
     private(set) var favoriteOutfitIDs: Set<String> = []
+    private(set) var changingFavorites: Set<String> = []
     private(set) var feedbackTags: [Wire.FeedbackTagResponse] = []
     private(set) var appliedChip: ContextChip?
     private(set) var appliedText: String?
@@ -62,14 +63,20 @@ final class TodayModel {
     private let wornLedger = WornLedger()
     private let accountGeneration = AccountLocalData.generation
     private let onRevision: (Wire.StylingResponse) -> Void
+    private let onFavoritesChange: () -> Void
     private var loadID = UUID()
     private var mutationID = UUID()
     private var actionRecommendationDate: String?
 
-    init(api: APIClient, wardrobe: WardrobeStore, onRevision: @escaping (Wire.StylingResponse) -> Void = { _ in }) {
+    init(
+        api: APIClient, wardrobe: WardrobeStore,
+        onRevision: @escaping (Wire.StylingResponse) -> Void = { _ in },
+        onFavoritesChange: @escaping () -> Void = {}
+    ) {
         self.api = api
         self.wardrobe = wardrobe
         self.onRevision = onRevision
+        self.onFavoritesChange = onFavoritesChange
     }
 
     var outfits: [Wire.OutfitResponse] { today?.outfits ?? [] }
@@ -167,11 +174,15 @@ final class TodayModel {
 
     /// Ask reuses the same outfit actions without manufacturing a Today response.
     func syncOutfit(_ outfit: Wire.OutfitResponse, recommendationDate: String? = nil) {
-        if outfit.isFavorited == true { favoriteOutfitIDs.insert(outfit.outfitId) }
-        else { favoriteOutfitIDs.remove(outfit.outfitId) }
+        syncFavorite(outfit)
         actionRecommendationDate = recommendationDate
         if let recommendationDate { wornOutfitIDs = wornLedger.outfits(on: recommendationDate) }
         needsLatestVersion = false
+    }
+
+    func syncFavorite(_ outfit: Wire.OutfitResponse) {
+        if outfit.isFavorited == true { favoriteOutfitIDs.insert(outfit.outfitId) }
+        else { favoriteOutfitIDs.remove(outfit.outfitId) }
     }
 
     func reloadAfterConflict() async -> Bool {
@@ -322,14 +333,20 @@ final class TodayModel {
         }
     }
 
-    func toggleFavorite(_ outfit: Wire.OutfitResponse) async {
+    @discardableResult
+    func toggleFavorite(_ outfit: Wire.OutfitResponse) async -> Bool {
+        guard changingFavorites.insert(outfit.outfitId).inserted else { return false }
+        defer { changingFavorites.remove(outfit.outfitId) }
         let favorite = !favoriteOutfitIDs.contains(outfit.outfitId)
         do {
             _ = try await api.send(Endpoints.setFavorite(favorite, outfitID: outfit.outfitId))
-            guard accountGeneration == AccountLocalData.generation else { return }
+            guard accountGeneration == AccountLocalData.generation else { return false }
             if favorite { favoriteOutfitIDs.insert(outfit.outfitId) } else { favoriteOutfitIDs.remove(outfit.outfitId) }
+            onFavoritesChange()
+            return true
         } catch {
             notice = userMessage(for: error)
+            return false
         }
     }
 

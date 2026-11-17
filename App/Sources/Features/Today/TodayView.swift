@@ -40,7 +40,12 @@ struct TodayView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .task(id: app.todayChange) {
-            if model == nil { model = TodayModel(api: app.api, wardrobe: app.wardrobe, onRevision: app.stylingDidChange) }
+            if model == nil {
+                model = TodayModel(
+                    api: app.api, wardrobe: app.wardrobe,
+                    onRevision: app.stylingDidChange, onFavoritesChange: app.favoritesDidChange
+                )
+            }
             await model?.load()
         }
     }
@@ -304,6 +309,7 @@ private struct TodayPage: View {
         .buttonStyle(.plain)
         .padding(4)
         .sensoryFeedback(.impact, trigger: isFavorite)
+        .disabled(model.changingFavorites.contains(outfit.outfitId))
         .accessibilityLabel(isFavorite ? "取消收藏" : "收藏这套")
     }
 

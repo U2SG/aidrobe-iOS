@@ -27,6 +27,7 @@ final class AskModel {
         var state: State
         var feedback: FeedbackKind?
         var styling: Wire.StylingResponse?
+        var needsOutfitUpdate: Bool
         var requestID: String
         var conversationID: String?
         var expectedRevision: Int?
@@ -37,6 +38,7 @@ final class AskModel {
 
         init(
             id: UUID = UUID(), createdAt: Date = .now, question: String, state: State, styling: Wire.StylingResponse? = nil,
+            needsOutfitUpdate: Bool = false,
             conversationID: String? = nil, expectedRevision: Int? = nil, baseOutfitID: String? = nil,
             inspirationID: String? = nil, inspirationOnly: Bool = false
         ) {
@@ -45,6 +47,7 @@ final class AskModel {
             self.question = question
             self.state = state
             self.styling = styling
+            self.needsOutfitUpdate = needsOutfitUpdate
             self.requestID = id.uuidString
             self.conversationID = conversationID
             self.expectedRevision = expectedRevision
@@ -88,13 +91,16 @@ final class AskModel {
 
     init(
         api: APIClient, wardrobe: WardrobeStore, bookmark: ConversationBookmark? = nil,
-        onRevision: @escaping (Wire.StylingResponse) -> Void = { _ in }
+        onRevision: @escaping (Wire.StylingResponse) -> Void = { _ in },
+        onFavoritesChange: @escaping () -> Void = {}
     ) {
         self.api = api
         self.wardrobe = wardrobe
         self.bookmark = bookmark
         self.onRevision = onRevision
-        outfitActions = TodayModel(api: api, wardrobe: wardrobe, onRevision: onRevision)
+        outfitActions = TodayModel(
+            api: api, wardrobe: wardrobe, onRevision: onRevision, onFavoritesChange: onFavoritesChange
+        )
         packing = PackingModel(api: api)
     }
 
@@ -193,6 +199,7 @@ final class AskModel {
                 garments: garments(ids: answer.itemRefs, snapshots: answer.itemRefSnapshots ?? [])
             )
             entries[index].styling = answer.styling
+            entries[index].needsOutfitUpdate = answer.designBrief?.needsOutfitUpdate == true
             baseOutfit = nil
             conversationID = answer.conversationId ?? conversationID
             if let intent = answer.tripIntent, intent.isTrip { tripDays = intent.durationDays }
@@ -338,7 +345,7 @@ final class AskModel {
                         state: .answered(
                             sessionID: message.askSessionId, text: message.content,
                             garments: garments(ids: ids, snapshots: message.itemRefSnapshots ?? [])
-                        ), styling: message.styling
+                        ), styling: message.styling, needsOutfitUpdate: message.designBrief?.needsOutfitUpdate == true
                     ))
                     question = nil
                 }
@@ -404,6 +411,10 @@ final class AskModel {
 
     func acceptRevision(_ result: Wire.StylingResponse) {
         guard accountGeneration == AccountLocalData.generation else { return }
+        if styling?.outfit.outfitId == result.outfit.outfitId {
+            // Favorite state can change while a newer brief still awaits its outfit.
+            outfitActions.syncFavorite(result.outfit)
+        }
         if conversationID == result.conversationId, let expectedRevision, expectedRevision > result.revision { return }
         let isNewRevision = styling?.conversationId != result.conversationId || styling?.revision != result.revision
         styling = result
@@ -489,19 +500,15 @@ final class AskModel {
     }
 
     func canGiveFeedback(_ entry: Entry) -> Bool {
-        if case let .answered(sessionID, _, _) = entry.state { return sessionID != nil || entry.styling != nil }
+        if case let .answered(sessionID, _, _) = entry.state { return sessionID != nil }
         return false
     }
 
     func sendFeedback(_ kind: FeedbackKind, for entry: Entry) async {
-        guard case let .answered(sessionID, _, _) = entry.state else { return }
+        guard case let .answered(sessionID?, _, _) = entry.state, entry.feedback == nil else { return }
         let expectedEpoch = epoch
         do {
-            if let outfitID = entry.styling?.outfit.outfitId {
-                _ = try await api.send(Endpoints.feedback(outfitID: outfitID, type: kind))
-            } else if let sessionID {
-                _ = try await api.send(Endpoints.askFeedback(sessionID: sessionID, type: kind))
-            } else { return }
+            _ = try await api.send(Endpoints.askFeedback(sessionID: sessionID, type: kind))
             guard isCurrent(expectedEpoch), let index = entries.firstIndex(where: { $0.id == entry.id }) else { return }
             entries[index].feedback = kind
         } catch { if isCurrent(expectedEpoch) { notice = userMessage(for: error) } }

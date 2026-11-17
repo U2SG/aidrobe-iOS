@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		FC24A927FCD049A2B3B405C1 /* FavoriteOutfitsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FC24A927FCD049A2B3B405C2 /* FavoriteOutfitsView.swift */; };
 		07E0E1755AFA72B153470D70 /* TodaySheets.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8587F1AAA07682D6879F836A /* TodaySheets.swift */; };
 		0E2B483E16E827DF76806B3A /* ShouldIBuyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 176970B58F7ED0903BB76179 /* ShouldIBuyView.swift */; };
 		110BDCEBA9F515D02888274C /* PrivacyView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 51B1F5F6A254EB7F4D808B06 /* PrivacyView.swift */; };
@@ -62,6 +63,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		FC24A927FCD049A2B3B405C2 /* FavoriteOutfitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteOutfitsView.swift; sourceTree = "<group>"; };
 		01EC21FD09F2E7EC8B2F8A62 /* SubjectLiftLab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SubjectLiftLab.swift; sourceTree = "<group>"; };
 		099E0BD64A4A33AF42DC1637 /* OutfitRecordView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutfitRecordView.swift; sourceTree = "<group>"; };
 		0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingListsView.swift; sourceTree = "<group>"; };
@@ -204,6 +206,7 @@
 		3C540C76B732B6B4DCD759FA /* Profile */ = {
 			isa = PBXGroup;
 			children = (
+				FC24A927FCD049A2B3B405C2 /* FavoriteOutfitsView.swift */,
 				4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */,
 				A2E9A48A4ECA24F8D2528E52 /* ProfileView.swift */,
 			);
@@ -479,6 +482,7 @@
 				2BCAE6DA805946BDBE8AD491 /* PackingModel.swift in Sources */,
 				110BDCEBA9F515D02888274C /* PrivacyView.swift in Sources */,
 				4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */,
+				FC24A927FCD049A2B3B405C1 /* FavoriteOutfitsView.swift in Sources */,
 				AA5F19D439A9DE6C450558DB /* ProfileView.swift in Sources */,
 				C268298B6B8AC55AA9D1D612 /* RootView.swift in Sources */,
 				2F94981E4C84EB3B67DE5FBD /* ShouldIBuyModel.swift in Sources */,

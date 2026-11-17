@@ -50,6 +50,7 @@ final class ShouldIBuyModel {
     private let uploader: PresignedUploader
     private let accountGeneration = AccountLocalData.generation
     private static let historyKey = AccountLocalData.purchaseHistoryKey
+    private var isCurrent: Bool { accountGeneration == AccountLocalData.generation && !Task.isCancelled }
 
     init(api: APIClient) {
         self.api = api
@@ -66,6 +67,7 @@ final class ShouldIBuyModel {
 
     /// Photo → upload → candidate → decision.
     func ask(about image: UIImage) async {
+        guard isCurrent else { return }
         photo = image
         parsed = nil
         guard let data = ImageCompressor.jpegData(from: image) else {
@@ -76,6 +78,8 @@ final class ShouldIBuyModel {
             let upload = try await self.uploader.upload(
                 data, fileName: "\(UUID().uuidString).jpg", contentType: "image/jpeg"
             )
+            // The upload uses its own transport; the shared API may now have another account's tokens.
+            try self.requireCurrentAccount()
             self.phase = .working("正在看这件衣服…")
             let candidate = try await self.api.send(Endpoints.createPurchaseCandidate(objectKey: upload.objectKey))
             try await self.settle(candidate)
@@ -84,16 +88,22 @@ final class ShouldIBuyModel {
 
     /// Looks again at a candidate whose parsing had not finished.
     func resume(candidateID: String) async {
+        guard isCurrent else { return }
         phase = .working("正在看这件衣服…")
         await run { try await self.settle(self.api.send(Endpoints.purchaseCandidate(candidateID))) }
     }
 
     /// Reopens an earlier decision exactly as it was written.
     func replay(_ asked: AskedPurchase) async {
+        guard isCurrent else { return }
         photo = nil
         parsed = nil
         phase = .working("正在取回当时的判断…")
-        await run { self.phase = .decided(try await self.api.send(Endpoints.wardrobeDecision(asked.decisionID))) }
+        await run {
+            let decision = try await self.api.send(Endpoints.wardrobeDecision(asked.decisionID))
+            try self.requireCurrentAccount()
+            self.phase = .decided(decision)
+        }
     }
 
     func call(for decisionID: String) -> AskedPurchase.Call? {
@@ -116,45 +126,61 @@ final class ShouldIBuyModel {
     /// Parsing is usually done when the candidate is created, but `submitted`
     /// (and any status this build doesn't know) must not spin forever.
     private func settle(_ first: Wire.PurchaseCandidateResponse) async throws {
+        try requireCurrentAccount()
         var candidate = first
         var attempts = 0
         while candidate.status == .submitted {
             guard attempts < 12 else { return phase = .stillWorking(candidateID: candidate.id) }
             attempts += 1
             try await Task.sleep(for: .seconds(1.5))
+            try requireCurrentAccount()
             candidate = try await api.send(Endpoints.purchaseCandidate(candidate.id))
+            try requireCurrentAccount()
         }
         parsed = candidate.parsedItem
         // `parse_failed` still gets a decision: the backend answers
         // "insufficient information" with a reason instead of an error.
         phase = .working("正在和你的衣橱对照…")
         let decision = try await decide(candidate.id)
+        try requireCurrentAccount()
         remember(decision)
         phase = .decided(decision)
     }
 
     private func decide(_ candidateID: String) async throws -> Wire.WardrobeDecisionResponse {
+        try requireCurrentAccount()
         do {
             return try await api.send(Endpoints.decide(candidateID: candidateID, concern: concern))
         } catch APIError.http(status: 404, _, _, _) {
             // A decision asked for right after creation can miss the new
             // candidate once; it is there a moment later.
             try await Task.sleep(for: .seconds(1))
+            try requireCurrentAccount()
             return try await api.send(Endpoints.decide(candidateID: candidateID, concern: concern))
         }
     }
 
     private func run(_ work: @escaping () async throws -> Void) async {
         do {
+            try requireCurrentAccount()
             try await work()
+        } catch is CancellationError {
+            return
         } catch let error as APIError where error.isFeatureDisabled {
+            guard isCurrent else { return }
             phase = .unavailable
         } catch APIError.decoding {
+            guard isCurrent else { return }
             // A status or verdict this build doesn't know (version skew).
             phase = .failed("这次的结果这个版本还看不懂，更新后再试")
         } catch {
+            guard isCurrent else { return }
             phase = .failed(userMessage(for: error))
         }
+    }
+
+    private func requireCurrentAccount() throws {
+        guard isCurrent else { throw CancellationError() }
     }
 
     private func remember(_ decision: Wire.WardrobeDecisionResponse) {

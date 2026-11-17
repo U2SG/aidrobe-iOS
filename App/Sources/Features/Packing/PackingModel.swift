@@ -85,6 +85,8 @@ final class PackingModel {
     private(set) var listRevision = UUID()
 
     private let api: APIClient
+    private let accountGeneration = AccountLocalData.generation
+    private var isCurrent: Bool { accountGeneration == AccountLocalData.generation && !Task.isCancelled }
 
     init(api: APIClient) {
         self.api = api
@@ -95,7 +97,7 @@ final class PackingModel {
     }
 
     func receive(_ list: Wire.PackingListResponse) {
-        guard !saving.contains(list.packingListId) else { return }
+        guard isCurrent, !saving.contains(list.packingListId) else { return }
         listRevision = UUID()
         if let index = lists.firstIndex(where: { $0.packingListId == list.packingListId }) {
             lists[index] = list
@@ -106,33 +108,41 @@ final class PackingModel {
     }
 
     func load() async {
-        guard saving.isEmpty, !isCreating else { return }
+        guard isCurrent, saving.isEmpty, !isCreating else { return }
         let revision = listRevision
         if lists.isEmpty { phase = .loading }
         do {
             let loaded = try await api.send(Endpoints.packingLists())
             // A reload started before an edit may contain an older snapshot.
-            guard revision == listRevision else { return }
+            guard isCurrent, revision == listRevision else { return }
             lists = loaded
             phase = .loaded
+        } catch is CancellationError {
+            return
         } catch let error as APIError where error.isFeatureDisabled {
+            guard isCurrent, revision == listRevision else { return }
             phase = .unavailable
         } catch {
+            guard isCurrent, revision == listRevision else { return }
             if lists.isEmpty { phase = .failed(userMessage(for: error)) }
         }
     }
 
     /// Returns the new list's id, or nil with `notice` set.
     func create(_ request: Wire.CreatePackingListRequest) async -> String? {
-        guard !isCreating else { return nil }
+        guard isCurrent, !isCreating else { return nil }
         listRevision = UUID()
         isCreating = true
         defer { isCreating = false }
         do {
             let list = try await api.send(Endpoints.createPackingList(request))
+            guard isCurrent else { return nil }
             receive(list)
             return list.packingListId
+        } catch is CancellationError {
+            return nil
         } catch let error as APIError where request.conversationId != nil {
+            guard isCurrent else { return nil }
             switch (error.status, error.reason) {
             case (422, "packing_scene_mismatch"):
                 notice = "这套搭配不适合第一天的场合。可以调整行程场合，或回到对话换一套。"
@@ -147,6 +157,7 @@ final class PackingModel {
             }
             return nil
         } catch {
+            guard isCurrent else { return nil }
             notice = userMessage(for: error)
             return nil
         }
@@ -156,7 +167,7 @@ final class PackingModel {
     /// request at a time per list, because each save replaces the whole item
     /// list — ticks made while one is in flight go out together in the next.
     func setPacked(_ packed: Bool, itemID: String, in listID: String) async {
-        guard let index = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
+        guard isCurrent, let index = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
         listRevision = UUID()
         var confirmed = lists[index]
         for row in lists[index].items.indices where lists[index].items[row].itemId == itemID {
@@ -171,10 +182,11 @@ final class PackingModel {
             listRevision = UUID()
         }
         repeat {
+            guard isCurrent, let current = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
             unsaved.remove(listID)
-            guard let current = lists.firstIndex(where: { $0.packingListId == listID }) else { return }
             do {
                 var saved = try await api.send(Endpoints.updatePackingList(listID, items: lists[current].items))
+                guard isCurrent else { return }
                 // Keep the plan we already have if the update response leaves it out.
                 if saved.plan == nil { saved.plan = confirmed.plan }
                 confirmed = saved
@@ -182,7 +194,10 @@ final class PackingModel {
                 if !unsaved.contains(listID), let latest = lists.firstIndex(where: { $0.packingListId == listID }) {
                     lists[latest] = saved
                 }
+            } catch is CancellationError {
+                return
             } catch {
+                guard isCurrent else { return }
                 unsaved.remove(listID)
                 if let latest = lists.firstIndex(where: { $0.packingListId == listID }) { lists[latest] = confirmed }
                 notice = userMessage(for: error)

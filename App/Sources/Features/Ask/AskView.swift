@@ -56,7 +56,7 @@ struct AskView<Tools: View>: View {
             if model == nil {
                 model = AskModel(
                     api: app.api, wardrobe: app.wardrobe, bookmark: app.conversationBookmark,
-                    onRevision: app.stylingDidChange
+                    onRevision: app.stylingDidChange, onFavoritesChange: app.favoritesDidChange
                 )
             }
             if let inspiration = app.inspirationToDiscuss {
@@ -109,6 +109,12 @@ struct AskView<Tools: View>: View {
                             .id(item.id)
                     }
                 }
+                if model.needsOutfitUpdate, model.styling != nil {
+                    VStack(alignment: .leading, spacing: Spacing.control) {
+                        SectionHeading(title: "待应用的新条件")
+                        DesignConditions(model: model)
+                    }
+                }
                 if let styling = model.styling {
                     StylingCard(model: model, styling: styling, onPacking: {
                         isTyping = false
@@ -120,7 +126,7 @@ struct AskView<Tools: View>: View {
                     .id(styling.outfit.outfitId)
                 } else if model.designBrief != nil {
                     VStack(alignment: .leading, spacing: Spacing.row) {
-                        SectionHeading(title: "条件已记下")
+                        SectionHeading(title: model.needsOutfitUpdate ? "待应用的新条件" : "条件已记下")
                         DesignConditions(model: model)
                         Text("继续聊聊，按这些条件生成方案后再采用。")
                             .font(.subheadline)
@@ -382,7 +388,7 @@ private struct StylingCard: View {
         VStack(alignment: .leading, spacing: Spacing.row) {
             SectionHeading(title: model.needsOutfitUpdate ? "上一套搭配" : "这一套")
             if model.needsOutfitUpdate {
-                Text("条件已记下。继续聊聊，按这些条件更新方案后再采用。")
+                Text("新条件还没有应用到这一套。继续聊聊，生成新方案后再采用。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
@@ -413,7 +419,7 @@ private struct StylingCard: View {
             Text(outfit.reason)
                 .font(.body)
                 .foregroundStyle(Color.secondaryLabel)
-            DesignConditions(model: model)
+            if !model.needsOutfitUpdate { DesignConditions(model: model) }
             pieces
             if model.isUpdatingDesign { ProgressView("正在保存修改…") }
             if let failure = model.actionFailure {
@@ -439,6 +445,7 @@ private struct StylingCard: View {
                         actions.favoriteOutfitIDs.contains(outfit.outfitId) ? "取消收藏" : "收藏这套",
                         systemImage: "heart"
                     ) { Task { await actions.toggleFavorite(outfit) } }
+                    .disabled(actions.changingFavorites.contains(outfit.outfitId))
                     if styling.status == .adopted, styling.recommendationDate == JournalDay.today {
                         Button(
                             actions.wornOutfitIDs.contains(outfit.outfitId) ? "已记录穿着" : "今天穿了这套",
@@ -586,7 +593,7 @@ private struct DesignConditions: View {
                     Text("这次想要：\(goal)")
                 }
                 if let style = constraints.targetStyle, !style.isEmpty, style != constraints.goal {
-                    Text("想尝试：\(style)")
+                    Text("想尝试：\(StylingText.styles(style))")
                 }
                 if constraints.exploration == true {
                     Text("这是本次尝试，不会自动改掉长期偏好。")
@@ -645,9 +652,17 @@ private struct AskEntryView: View {
                     .foregroundStyle(Color.secondaryLabel)
                     .lineSpacing(4)
                     .textSelection(.enabled)
+                if entry.needsOutfitUpdate {
+                    Text("本次已记下新条件，还没有生成新搭配。")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                }
                 if let styling = entry.styling {
                     NavigationLink(value: styling) {
-                        Label("查看第\(styling.revision)版搭配", systemImage: "square.stack")
+                        Label(
+                            entry.needsOutfitUpdate ? "查看上一套（第\(styling.revision)版）" : "查看第\(styling.revision)版搭配",
+                            systemImage: "square.stack"
+                        )
                             .font(.subheadline)
                             .frame(minHeight: 44)
                             .contentShape(.rect)
