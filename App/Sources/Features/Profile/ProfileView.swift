@@ -92,7 +92,7 @@ struct ProfileView: View {
             }
         }
         Section {
-            NavigationLink("收藏穿搭", systemImage: "heart") { FavoriteOutfitsView() }
+            NavigationLink("收藏穿搭") { FavoriteOutfitsView() }
             NavigationLink("衣橱洞察") { InsightsView() }
             NavigationLink("风格灵感") { StyleInspirationView() }
             NavigationLink("记住的偏好") { MemoryView() }
