@@ -57,7 +57,9 @@ private func shoppingClient(_ handler: @escaping StubTransport.Handler) -> (APIC
 }
 
 private func shoppingBody(_ request: URLRequest) throws -> [String: Any] {
-    try #require(JSONSerialization.jsonObject(with: #require(request.httpBody)) as? [String: Any])
+    let data = try #require(request.httpBody)
+    let value = try JSONSerialization.jsonObject(with: data)
+    return try #require(value as? [String: Any])
 }
 
 private actor LostShoppingResponse {
@@ -68,7 +70,9 @@ private actor LostShoppingResponse {
 @Suite struct ShoppingContractTests {
     @Test func independentShoppingAndOldSnapshotsRemainReadable() throws {
         let endpoint = try Endpoints.decide(candidateID: ShoppingFixture.candidate, concern: .color)
-        let body = try #require(JSONSerialization.jsonObject(with: #require(endpoint.body)) as? [String: Any])
+        let data = try #require(endpoint.body)
+        let value = try JSONSerialization.jsonObject(with: data)
+        let body = try #require(value as? [String: Any])
         #expect(body["concern"] as? String == "color")
         #expect(body["conversation_id"] == nil)
         #expect(body["expected_revision"] == nil)
