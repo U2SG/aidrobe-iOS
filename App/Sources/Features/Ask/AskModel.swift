@@ -70,6 +70,7 @@ final class AskModel {
     private(set) var conversationID: String?
     private(set) var tripDays: Int?
     private(set) var packingListID: String?
+    private(set) var purchaseDecisions: [Wire.WardrobeDecisionResponse] = []
     private(set) var isRestoring = false
     private(set) var isUpdatingDesign = false
     private(set) var restorationFailure: String?
@@ -88,6 +89,7 @@ final class AskModel {
     private var restoringID: String?
     private var actionRequestIDs: [String: String] = [:]
     private var retryAction: DesignAction?
+    private var purchaseRevision = UUID()
 
     init(
         api: APIClient, wardrobe: WardrobeStore, bookmark: ConversationBookmark? = nil,
@@ -132,6 +134,12 @@ final class AskModel {
     var lockedItemIDs: [String] { designConstraints?.lockedItemIds ?? [] }
     var excludedItemIDs: [String] { designConstraints?.excludedItemIds ?? [] }
     var packingList: Wire.PackingListResponse? { packingListID.flatMap(packing.list) }
+    var shoppingSource: ShoppingDesignSource? {
+        guard let conversationID, let expectedRevision, let designConstraints else { return nil }
+        return ShoppingDesignSource(
+            conversationID: conversationID, revision: expectedRevision, constraints: designConstraints
+        )
+    }
     var packingAnchorEntryID: UUID? {
         guard let list = packingList else { return nil }
         if let createdAt = list.createdAt {
@@ -206,6 +214,11 @@ final class AskModel {
             if let result = answer.styling { acceptRevision(result) }
             acceptBrief(answer.designBrief)
             if let conversationID { bookmark?.save(conversationID) }
+            // A direct reply such as “不买了” can update the linked server
+            // choice. Refresh only the purchase records, preserving this turn.
+            if let conversationID, !purchaseDecisions.isEmpty {
+                await refreshPurchases(conversationID, epoch: expectedEpoch)
+            }
         } catch {
             guard isCurrent(expectedEpoch), let index = entries.firstIndex(where: { $0.id == entryID }) else { return }
             if (error as? APIError)?.isFeatureDisabled == true {
@@ -266,6 +279,48 @@ final class AskModel {
         await refreshStyling(conversationID)
     }
 
+    /// Capture the owning conversation, epoch and account before opening a
+    /// shopping sheet. A late result cannot attach itself to a new dialogue.
+    func purchaseReceiver() -> (Wire.WardrobeDecisionResponse) -> Void {
+        let expectedEpoch = epoch
+        let expectedConversation = conversationID
+        return { [weak self] decision in
+            guard let self, self.isCurrent(expectedEpoch), let expectedConversation,
+                  self.conversationID == expectedConversation,
+                  decision.designContext?.conversationId == expectedConversation else { return }
+            if let existing = self.purchaseDecisions.first(where: { $0.id == decision.id }),
+               (existing.choiceUpdatedAt ?? .distantPast) > (decision.choiceUpdatedAt ?? .distantPast) { return }
+            self.purchaseRevision = UUID()
+            self.purchaseDecisions.removeAll { $0.id == decision.id }
+            self.purchaseDecisions.append(decision)
+            self.purchaseDecisions.sort { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
+        }
+    }
+
+    func reopenConversation(_ id: String) async {
+        resetConversation()
+        await restore(id)
+    }
+
+    private func syncPurchases(_ decisions: [Wire.WardrobeDecisionResponse], conversationID: String) {
+        purchaseDecisions = decisions.filter { $0.designContext?.conversationId == conversationID }
+            .sorted { ($0.createdAt, $0.id) < ($1.createdAt, $1.id) }
+    }
+
+    private func refreshPurchases(_ id: String, epoch expectedEpoch: UUID) async {
+        purchaseRevision = UUID()
+        let revision = purchaseRevision
+        do {
+            let result = try await api.send(Endpoints.askConversation(id))
+            guard isCurrent(expectedEpoch), !Task.isCancelled, conversationID == id,
+                  revision == purchaseRevision else { return }
+            syncPurchases(result.purchaseDecisions ?? [], conversationID: id)
+        } catch {
+            guard isCurrent(expectedEpoch), !Task.isCancelled else { return }
+            notice = "回答已记下，购买记录暂时没刷新。重新打开这段对话时会再读取。"
+        }
+    }
+
     private func syncPackingList(_ list: Wire.PackingListResponse?) {
         packingListID = list?.packingListId
         if let list { packing.receive(list) }
@@ -281,6 +336,8 @@ final class AskModel {
         conversationID = nil
         tripDays = nil
         packingListID = nil
+        purchaseDecisions = []
+        purchaseRevision = UUID()
         restoringID = nil
         restorationFailure = nil
         actionFailure = nil
@@ -324,6 +381,9 @@ final class AskModel {
     private func restore(_ id: String) async {
         let expectedEpoch = UUID()
         let packingRevision = packing.listRevision
+        purchaseRevision = UUID()
+        let purchasesVersion = purchaseRevision
+        let previousConversationID = conversationID
         epoch = expectedEpoch
         isRestoring = true
         restoringID = id
@@ -361,6 +421,9 @@ final class AskModel {
             if packingRevision == packing.listRevision || packingList?.conversationId != result.conversationId {
                 syncPackingList(result.packingList)
             }
+            if purchasesVersion == purchaseRevision || previousConversationID != result.conversationId {
+                syncPurchases(result.purchaseDecisions ?? [], conversationID: result.conversationId)
+            }
             if let result = result.styling {
                 outfitActions.syncOutfit(result.outfit, recommendationDate: result.recommendationDate)
             }
@@ -390,14 +453,19 @@ final class AskModel {
         let expectedEpoch = epoch
         let previousPackingListID = packingListID
         let packingRevision = packing.listRevision
+        purchaseRevision = UUID()
+        let purchasesVersion = purchaseRevision
         do {
             let result = try await api.send(Endpoints.askConversation(id))
             guard isCurrent(expectedEpoch), conversationID == id, !Task.isCancelled else { return }
             if let result = result.styling { acceptRevision(result) }
-            else { styling = nil }
+            else if (result.designBrief?.revision ?? 0) >= (expectedRevision ?? 0) { styling = nil }
             acceptBrief(result.designBrief)
             if previousPackingListID == packingListID, packingRevision == packing.listRevision {
                 syncPackingList(result.packingList)
+            }
+            if purchasesVersion == purchaseRevision {
+                syncPurchases(result.purchaseDecisions ?? [], conversationID: id)
             }
             needsLatestVersion = false
             restorationFailure = nil

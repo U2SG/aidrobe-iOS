@@ -66,6 +66,135 @@ final class WalkthroughTests: XCTestCase {
         push("数据与隐私", shot: "48-privacy")
     }
 
+    /// Runs the real shopping pipeline with the existing synthetic DEBUG photo.
+    /// It checks continuity and persistence, not recognition or styling quality.
+    func testShoppingContinuesTheDesignAndReplaysSavedChoice() {
+        launch(onboarded: true, extra: ["-aidrobe.display.appearance", "light", "-AidrobeShoppingDemo"])
+        guard app.tabBars.buttons["问问"].waitForExistence(timeout: 60) else { return XCTFail("Ask tab unavailable") }
+        app.tabBars.buttons["问问"].tap()
+        settle(3)
+        let newConversation = app.buttons["新对话"]
+        if newConversation.exists {
+            guard reveal(newConversation, towardTop: true) else { return XCTFail("Cannot start a fresh design") }
+            newConversation.tap()
+            settle(2)
+        }
+        sendDesignMessage("周末出去玩，想鲜艳一点，保留衣橱里的黑裤子。")
+        let shopping = app.buttons["ask.shopping"]
+        guard shopping.waitForExistence(timeout: 90), waitUntilEnabled(shopping), reveal(shopping) else {
+            return XCTFail("The design did not expose its shopping entry")
+        }
+        shot("70-shopping-design")
+        shopping.tap()
+
+        let result = app.staticTexts["shopping.result"]
+        guard result.waitForExistence(timeout: 90) else { return XCTFail("Shopping evaluation did not finish") }
+        let frozenText = result.label
+        XCTAssert(app.descendants(matching: .any)["shopping.designContext"].exists)
+        shot("71-shopping-result")
+        let later = app.buttons["shopping.choice.later"]
+        guard reveal(later) else { return XCTFail("Purchase choice is not reachable") }
+        later.tap()
+        let saved = app.staticTexts["shopping.choice.saved"]
+        guard saved.waitForExistence(timeout: 20) else { return XCTFail("Purchase choice was not saved") }
+        XCTAssert(saved.label.contains("再想想"))
+        shot("72-shopping-choice-saved")
+
+        let resume = app.buttons["shopping.continue"]
+        guard reveal(resume) else { return XCTFail("Cannot return to the design") }
+        resume.tap()
+        settle(2)
+        let purchase = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'ask.purchaseDecision.'")).firstMatch
+        guard purchase.waitForExistence(timeout: 20), waitUntilHittable(purchase) else {
+            return XCTFail("Returning did not reveal the purchase result in the original conversation")
+        }
+        let purchaseIdentifier = purchase.identifier
+        XCTAssert(purchase.label.contains("再想想"))
+        shot("73-shopping-in-conversation")
+        sendDesignMessage("那先不买了，继续用已有衣服搭，保持刚才想尝试的风格。")
+        guard waitUntilEnabled(app.buttons["新对话"], timeout: 90) else { return XCTFail("Continuation did not finish") }
+        let updatedChoice = XCTNSPredicateExpectation(
+            predicate: NSPredicate(format: "label CONTAINS %@", "这次不买"), object: purchase
+        )
+        guard XCTWaiter.wait(for: [updatedChoice], timeout: 20) == .completed else {
+            return XCTFail("The conversation did not refresh the natural-language purchase choice")
+        }
+        shot("74-shopping-continue-design")
+
+        app.terminate()
+        launch(onboarded: true)
+        guard app.tabBars.buttons["问问"].waitForExistence(timeout: 60) else { return XCTFail("Ask tab unavailable after restart") }
+        app.tabBars.buttons["问问"].tap()
+        let restored = app.buttons[purchaseIdentifier]
+        guard restored.waitForExistence(timeout: 30), reveal(restored, towardTop: true) else {
+            return XCTFail("Saved purchase is missing after restarting")
+        }
+        XCTAssert(restored.label.contains("这次不买"))
+        restored.tap()
+        guard result.waitForExistence(timeout: 30) else { return XCTFail("Historical decision did not replay") }
+        XCTAssertEqual(result.label, frozenText)
+        guard reveal(saved) else { return XCTFail("Saved choice is missing from historical decision") }
+        XCTAssert(saved.label.contains("这次不买"))
+        shot("75-shopping-replayed")
+
+        let reassess = app.buttons["shopping.reassess"]
+        guard reveal(reassess) else { return XCTFail("The saved candidate cannot be reassessed") }
+        reassess.tap()
+        let evaluate = app.buttons["shopping.evaluateLatest"]
+        guard evaluate.waitForExistence(timeout: 30), reveal(evaluate) else {
+            return XCTFail("Latest design conditions were not presented for confirmation")
+        }
+        XCTAssertFalse(app.buttons["shopping.pickPhoto"].exists)
+        shot("76-shopping-review-new-conditions")
+        evaluate.tap()
+        guard result.waitForExistence(timeout: 90), reveal(resume) else {
+            return XCTFail("The saved candidate was not reassessed without another photo")
+        }
+        resume.tap()
+        let assessments = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'ask.purchaseDecision.'"))
+        let appended = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: assessments)
+        guard XCTWaiter.wait(for: [appended], timeout: 20) == .completed else {
+            return XCTFail("Reassessment replaced the original purchase record")
+        }
+        let latest = assessments.allElementsBoundByIndex.first { $0.identifier != purchaseIdentifier }
+        guard let latest, waitUntilHittable(latest) else { return XCTFail("The new assessment was not revealed") }
+        shot("77-shopping-both-assessments")
+        guard reveal(restored, towardTop: true) else { return XCTFail("Original assessment disappeared") }
+        restored.tap()
+        guard result.waitForExistence(timeout: 30) else { return XCTFail("Original assessment is no longer readable") }
+        XCTAssertEqual(result.label, frozenText)
+        guard reveal(saved) else { return XCTFail("Original purchase choice disappeared") }
+        XCTAssert(saved.label.contains("这次不买"))
+    }
+
+    private func sendDesignMessage(_ text: String) {
+        let input = app.descendants(matching: .any)["ask.message"]
+        guard input.waitForExistence(timeout: 15) else { return XCTFail("Design input unavailable") }
+        input.tap()
+        input.typeText(text)
+        let send = app.buttons["ask.send"]
+        guard waitUntilEnabled(send) else { return XCTFail("Design message cannot be sent") }
+        send.tap()
+    }
+
+    private func waitUntilEnabled(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
+        let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
+        return XCTWaiter.wait(for: [ready], timeout: timeout) == .completed
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
+        return XCTWaiter.wait(for: [visible], timeout: timeout) == .completed
+    }
+
+    private func reveal(_ element: XCUIElement, towardTop: Bool = false) -> Bool {
+        for _ in 0..<10 {
+            if element.exists, element.isHittable { return true }
+            if towardTop { app.swipeDown() } else { app.swipeUp() }
+        }
+        return element.exists && element.isHittable
+    }
+
     /// Opens a row, screenshots the page (and optionally one scroll down), and comes back.
     private func back() {
         app.navigationBars.buttons.element(boundBy: 0).tap()

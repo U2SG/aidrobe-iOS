@@ -9,6 +9,8 @@ struct AskView<Tools: View>: View {
     @State private var model: AskModel?
     @State private var draft = ""
     @State private var tripSource: PackingDesignSource?
+    @State private var shopping: AskShoppingPresentation?
+    @State private var purchaseToReveal: (conversationID: String, decisionID: String)?
     @State private var showsCurrentOutfit = true
     @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
     @FocusState private var isTyping: Bool
@@ -53,6 +55,31 @@ struct AskView<Tools: View>: View {
                 )
             }
         }
+        .sheet(item: $shopping, onDismiss: {
+            let target = purchaseToReveal
+            purchaseToReveal = nil
+            if let target, model?.conversationID == target.conversationID,
+               model?.purchaseDecisions.contains(where: { $0.id == target.decisionID }) == true {
+                scrollPosition.scrollTo(id: AskScrollTarget.purchase(target.decisionID), anchor: .center)
+            }
+            Task { await model?.refreshSavedDesign() }
+        }) { presentation in
+            NavigationStack {
+                ShouldIBuyView(
+                    source: presentation.source, decisionID: presentation.decisionID,
+                    onDecision: presentation.onDecision,
+                    onContinue: { conversationID in
+                        shopping = nil
+                        if model?.conversationID != conversationID { app.discussConversation(conversationID) }
+                    }
+                )
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        Button("完成") { shopping = nil }
+                    }
+                }
+            }
+        }
         .task(id: app.stylingChange) {
             if model == nil {
                 model = AskModel(
@@ -60,7 +87,14 @@ struct AskView<Tools: View>: View {
                     onRevision: app.stylingDidChange, onFavoritesChange: app.favoritesDidChange
                 )
             }
-            if let inspiration = app.inspirationToDiscuss {
+            if let conversationID = app.conversationToDiscuss {
+                await model?.reopenConversation(conversationID)
+                guard !Task.isCancelled else { return }
+                if app.conversationToDiscuss == conversationID { app.conversationToDiscuss = nil }
+                // Keep a failed explicit handoff visible. Loading the previous
+                // bookmark here could make another conversation look successful.
+                return
+            } else if let inspiration = app.inspirationToDiscuss {
                 model?.beginDesign(from: inspiration)
                 app.inspirationToDiscuss = nil
                 draft = AskModel.inspirationPrompt
@@ -112,7 +146,20 @@ struct AskView<Tools: View>: View {
                     case let .packingList(list):
                         savedPackingList(list)
                             .id(item.id)
+                    case let .purchase(decision):
+                        savedPurchase(decision, model: model)
+                            .id(item.id)
                     }
+                }
+                if model.shoppingSource != nil {
+                    Button("看看要不要买", systemImage: "bag") {
+                        isTyping = false
+                        openShopping(model)
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .disabled(model.isBusy || model.needsLatestVersion || model.hasUnresolvedQuestion)
+                    .accessibilityIdentifier("ask.shopping")
                 }
                 if !model.hasConversation && !model.isRestoring { opening(model) }
             }
@@ -185,13 +232,63 @@ struct AskView<Tools: View>: View {
 
     private func timeline(for model: AskModel) -> [AskTimelineItem] {
         var items = model.entries.map(AskTimelineItem.turn)
-        if let list = model.packingList {
-            let anchor = model.packingAnchorEntryID.flatMap { id in
-                model.entries.firstIndex { $0.id == id }
-            }
-            items.insert(.packingList(list), at: anchor.map { $0 + 1 } ?? 0)
+        if let list = model.packingList { items.append(.packingList(list)) }
+        items.append(contentsOf: model.purchaseDecisions.map(AskTimelineItem.purchase))
+        let fallbackDate = model.entries.first?.createdAt ?? .distantPast
+        return items.sorted {
+            let left = $0.createdAt ?? fallbackDate
+            let right = $1.createdAt ?? fallbackDate
+            return left == right ? $0.sortKey < $1.sortKey : left < right
         }
-        return items
+    }
+
+    private func openShopping(_ model: AskModel, decisionID: String? = nil) {
+        purchaseToReveal = nil
+        let receive = model.purchaseReceiver()
+        shopping = AskShoppingPresentation(
+            source: model.shoppingSource, decisionID: decisionID, onDecision: { decision in
+                receive(decision)
+                guard let conversationID = decision.designContext?.conversationId,
+                      model.conversationID == conversationID,
+                      model.purchaseDecisions.contains(where: { $0.id == decision.id }) else { return }
+                purchaseToReveal = (conversationID, decision.id)
+            }
+        )
+    }
+
+    private func savedPurchase(_ decision: Wire.WardrobeDecisionResponse, model: AskModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            SectionHeading(title: "看过的候选")
+            Button {
+                openShopping(model, decisionID: decision.id)
+            } label: {
+                HStack(alignment: .top, spacing: Spacing.row) {
+                    VStack(alignment: .leading, spacing: Spacing.tight) {
+                        Text(decision.decisionText)
+                            .font(.body).foregroundStyle(Color.label)
+                        if let goal = decision.designContext?.constraints.goal, !goal.isEmpty {
+                            Text("当时想要：\(goal)")
+                                .font(.subheadline).foregroundStyle(Color.secondaryLabel)
+                        }
+                        if let raw = decision.choice?.rawValue, let call = AskedPurchase.Call(rawValue: raw) {
+                            Text(call.title).font(.subheadline).foregroundStyle(Color.accent)
+                        }
+                        Text(decision.createdAt.formatted(.dateTime.month().day().hour().minute().locale(Locale(identifier: "zh_CN"))))
+                            .font(.caption).foregroundStyle(Color.tertiaryLabel)
+                    }
+                    Spacer(minLength: Spacing.tight)
+                    Image(systemName: "chevron.right").font(.footnote).foregroundStyle(Color.tertiaryLabel)
+                }
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .buttonStyle(.plain)
+            .disabled(model.isBusy)
+            .accessibilityIdentifier("ask.purchaseDecision.\(decision.id)")
+            .accessibilityHint("回看当时的条件和判断，或修改购买选择")
+            Divider().overlay(Color.separator)
+        }
     }
 
     private func header(_ model: AskModel) -> some View {
@@ -363,6 +460,7 @@ struct AskView<Tools: View>: View {
                     .controlSize(.large)
                     .disabled(!model.canAsk || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     .accessibilityLabel("发送")
+                    .accessibilityIdentifier("ask.send")
                 }
             }
         }
@@ -387,20 +485,47 @@ private struct AskPackingRoute: Hashable {
     let listID: String
 }
 
+private struct AskShoppingPresentation: Identifiable {
+    let id = UUID()
+    let source: ShoppingDesignSource?
+    let decisionID: String?
+    let onDecision: (Wire.WardrobeDecisionResponse) -> Void
+}
+
 private enum AskScrollTarget: Hashable, Sendable {
     case currentOutfit
     case turn(UUID)
     case packingList(String)
+    case purchase(String)
 }
 
 private enum AskTimelineItem: Identifiable {
     case turn(AskModel.Entry)
     case packingList(Wire.PackingListResponse)
+    case purchase(Wire.WardrobeDecisionResponse)
 
     var id: AskScrollTarget {
         switch self {
         case let .turn(entry): .turn(entry.id)
         case let .packingList(list): .packingList(list.packingListId)
+        case let .purchase(decision): .purchase(decision.id)
+        }
+    }
+
+    var createdAt: Date? {
+        switch self {
+        case let .turn(entry): entry.createdAt
+        case let .packingList(list): list.createdAt
+        case let .purchase(decision): decision.createdAt
+        }
+    }
+
+    /// Stable tie-breakers retain the same order after reopening a conversation.
+    var sortKey: String {
+        switch self {
+        case let .turn(entry): "0-\(entry.id)"
+        case let .packingList(list): "1-\(list.packingListId)"
+        case let .purchase(decision): "2-\(decision.id)"
         }
     }
 }

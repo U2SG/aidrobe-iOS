@@ -43,6 +43,7 @@ final class AppModel {
     var selectedTab: AppTab = .today
     var outfitToDiscuss: Wire.OutfitResponse?
     var inspirationToDiscuss: Wire.InspirationResponse?
+    var conversationToDiscuss: String?
 
     var conversationBookmark: ConversationBookmark? {
         guard let accountID = ConversationBookmark.accountID(
@@ -65,14 +66,23 @@ final class AppModel {
     }
 
     func discussOutfit(_ outfit: Wire.OutfitResponse) {
+        conversationToDiscuss = nil
         inspirationToDiscuss = nil
         outfitToDiscuss = outfit
         openAsk()
     }
 
     func discussInspiration(_ inspiration: Wire.InspirationResponse) {
+        conversationToDiscuss = nil
         outfitToDiscuss = nil
         inspirationToDiscuss = inspiration
+        openAsk()
+    }
+
+    func discussConversation(_ conversationID: String) {
+        outfitToDiscuss = nil
+        inspirationToDiscuss = nil
+        conversationToDiscuss = conversationID
         openAsk()
     }
 
@@ -113,6 +123,7 @@ final class AppModel {
         AccountLocalData.clear()
         outfitToDiscuss = nil
         inspirationToDiscuss = nil
+        conversationToDiscuss = nil
         selectedTab = .today
         onboardingCompleted = false
     }

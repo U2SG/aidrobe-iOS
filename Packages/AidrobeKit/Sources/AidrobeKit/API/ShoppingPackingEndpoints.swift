@@ -6,11 +6,15 @@ extension Endpoints {
     // MARK: Should I buy
 
     /// `objectKey` is the presign `object_key` of an uploaded screenshot or photo.
-    public static func createPurchaseCandidate(objectKey: String) throws -> Endpoint<Wire.PurchaseCandidateResponse> {
+    public static func createPurchaseCandidate(
+        objectKey: String, requestID: String? = nil
+    ) throws -> Endpoint<Wire.PurchaseCandidateResponse> {
         try Endpoint(
             .post,
             "/v1/purchase-candidates",
-            json: Wire.CreatePurchaseCandidateRequest(sourceType: .screenshot, sourceAssetId: objectKey)
+            json: Wire.CreatePurchaseCandidateRequest(
+                sourceType: .screenshot, sourceAssetId: objectKey, requestId: requestID
+            )
         )
     }
 
@@ -18,22 +22,41 @@ extension Endpoints {
         Endpoint(.get, "/v1/purchase-candidates/\(candidateID)")
     }
 
-    /// Idempotent per candidate: a repeated call replays the first decision and
-    /// ignores a new `concern`.
+    /// Contextual evaluations bind all three identifiers. A retry reuses the
+    /// exact request ID and body; a changed brief is a separate evaluation.
     public static func decide(
         candidateID: String,
-        concern: Wire.DecisionRequest.ConcernPayload = .none
+        concern: Wire.DecisionRequest.ConcernPayload = .none,
+        conversationID: String? = nil,
+        expectedRevision: Int? = nil,
+        requestID: String? = nil
     ) throws -> Endpoint<Wire.WardrobeDecisionResponse> {
         try Endpoint(
             .post,
             "/v1/purchase-candidates/\(candidateID)/decision",
-            json: Wire.DecisionRequest(concern: concern)
+            json: Wire.DecisionRequest(
+                concern: concern, conversationId: conversationID,
+                expectedRevision: expectedRevision, requestId: requestID
+            ),
+            timeout: Endpoint<Wire.WardrobeDecisionResponse>.slowTimeout
         )
     }
 
     /// Replays a decision from its snapshot; the wording never changes.
     public static func wardrobeDecision(_ decisionID: String) -> Endpoint<Wire.WardrobeDecisionResponse> {
         Endpoint(.get, "/v1/wardrobe-decisions/\(decisionID)")
+    }
+
+    public static func setPurchaseChoice(
+        _ choice: Wire.PurchaseChoiceRequest.ChoicePayload?, decisionID: String
+    ) throws -> Endpoint<Wire.WardrobeDecisionResponse> {
+        let path = "/v1/wardrobe-decisions/\(decisionID)/choice"
+        // The generator normalizer makes nullable fields optional. Clearing
+        // this required nullable field must still send an explicit JSON null.
+        guard let choice else {
+            return Endpoint(.put, path, body: Data(#"{"choice":null}"#.utf8))
+        }
+        return try Endpoint(.put, path, json: Wire.PurchaseChoiceRequest(choice: choice))
     }
 
     // MARK: Packing
