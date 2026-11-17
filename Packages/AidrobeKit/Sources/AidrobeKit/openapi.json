@@ -1855,6 +1855,80 @@
     }
    }
   },
+  "/v1/recommendations/outfits/favorites": {
+   "get": {
+    "tags": [
+     "recommendations"
+    ],
+    "summary": "List Favorite Outfits",
+    "operationId": "list_favorite_outfits_v1_recommendations_outfits_favorites_get",
+    "parameters": [
+     {
+      "name": "limit",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "maximum": 50,
+       "minimum": 1,
+       "default": 20,
+       "title": "Limit"
+      }
+     },
+     {
+      "name": "offset",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "integer",
+       "minimum": 0,
+       "default": 0,
+       "title": "Offset"
+      }
+     },
+     {
+      "name": "Authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "Authorization"
+      }
+     },
+     {
+      "name": "X-User-Id",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "title": "X-User-Id"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/ResponseModel_FavoriteOutfitsResponse_"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/v1/recommendations/outfits/{outfit_id}": {
    "get": {
     "tags": [
@@ -7311,6 +7385,17 @@
       },
       "type": "array",
       "title": "Used"
+     },
+     "tool_trace": {
+      "items": {
+       "$ref": "#/components/schemas/AskToolTrace"
+      },
+      "type": "array",
+      "title": "Tool Trace"
+     },
+     "failure_reason": {
+      "type": "string",
+      "title": "Failure Reason"
      }
     },
     "type": "object",
@@ -7321,6 +7406,41 @@
      "tokens_used"
     ],
     "title": "AskResponse"
+   },
+   "AskToolTrace": {
+    "properties": {
+     "tool": {
+      "type": "string",
+      "title": "Tool"
+     },
+     "arguments": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Arguments"
+     },
+     "result": {
+      "additionalProperties": true,
+      "type": "object",
+      "title": "Result"
+     },
+     "status": {
+      "type": "string",
+      "title": "Status"
+     },
+     "duration_ms": {
+      "type": "integer",
+      "title": "Duration Ms"
+     }
+    },
+    "type": "object",
+    "required": [
+     "tool",
+     "arguments",
+     "result",
+     "status",
+     "duration_ms"
+    ],
+    "title": "AskToolTrace"
    },
    "AskToolUse": {
     "properties": {
@@ -8632,6 +8752,37 @@
      "success"
     ],
     "title": "FavoriteOutfitResponse"
+   },
+   "FavoriteOutfitsResponse": {
+    "properties": {
+     "items": {
+      "items": {
+       "$ref": "#/components/schemas/OutfitResponse"
+      },
+      "type": "array",
+      "title": "Items"
+     },
+     "limit": {
+      "type": "integer",
+      "title": "Limit"
+     },
+     "offset": {
+      "type": "integer",
+      "title": "Offset"
+     },
+     "has_more": {
+      "type": "boolean",
+      "title": "Has More"
+     }
+    },
+    "type": "object",
+    "required": [
+     "items",
+     "limit",
+     "offset",
+     "has_more"
+    ],
+    "title": "FavoriteOutfitsResponse"
    },
    "FeedbackBundleRequest": {
     "properties": {
@@ -11150,6 +11301,25 @@
     },
     "type": "object",
     "title": "ResponseModel[FavoriteOutfitResponse]"
+   },
+   "ResponseModel_FavoriteOutfitsResponse_": {
+    "properties": {
+     "code": {
+      "type": "integer",
+      "title": "Code",
+      "default": 0
+     },
+     "message": {
+      "type": "string",
+      "title": "Message",
+      "default": "ok"
+     },
+     "data": {
+      "$ref": "#/components/schemas/FavoriteOutfitsResponse"
+     }
+    },
+    "type": "object",
+    "title": "ResponseModel[FavoriteOutfitsResponse]"
    },
    "ResponseModel_FeedbackBundleResponse_": {
     "properties": {

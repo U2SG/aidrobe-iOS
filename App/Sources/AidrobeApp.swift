@@ -39,6 +39,7 @@ final class AppModel {
     private(set) var stylingChange = UUID()
     private(set) var askNavigationChange = UUID()
     private(set) var todayChange = UUID()
+    private(set) var favoritesChange = UUID()
     var selectedTab: AppTab = .today
     var outfitToDiscuss: Wire.OutfitResponse?
     var inspirationToDiscuss: Wire.InspirationResponse?
@@ -55,6 +56,12 @@ final class AppModel {
         conversationBookmark?.save(styling.conversationId)
         stylingChange = UUID()
         if styling.status == .adopted { todayChange = UUID() }
+    }
+
+    func favoritesDidChange() {
+        favoritesChange = UUID()
+        todayChange = UUID()
+        stylingChange = UUID()
     }
 
     func discussOutfit(_ outfit: Wire.OutfitResponse) {

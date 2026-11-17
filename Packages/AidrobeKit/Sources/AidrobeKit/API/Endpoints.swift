@@ -93,6 +93,17 @@ public enum Endpoints {
         Endpoint(favorite ? .post : .delete, "/v1/recommendations/outfits/\(outfitID)/favorite")
     }
 
+    public static func favoriteOutfits(limit: Int = 20, offset: Int = 0) -> Endpoint<Wire.FavoriteOutfitsResponse> {
+        Endpoint(.get, "/v1/recommendations/outfits/favorites", query: [
+            URLQueryItem(name: "limit", value: "\(limit)"),
+            URLQueryItem(name: "offset", value: "\(offset)"),
+        ], headers: ["Cache-Control": "no-cache"])
+    }
+
+    public static func outfit(_ outfitID: String) -> Endpoint<Wire.OutfitResponse> {
+        Endpoint(.get, "/v1/recommendations/outfits/\(outfitID)", headers: ["Cache-Control": "no-cache"])
+    }
+
     public static func feedbackTags() -> Endpoint<Wire.FeedbackTagsResponse> {
         Endpoint(.get, "/v1/recommendations/feedback-tags")
     }
