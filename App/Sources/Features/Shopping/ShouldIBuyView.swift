@@ -10,6 +10,21 @@ struct ShouldIBuyView: View {
     @Environment(AppModel.self) private var app
     @State private var model: ShouldIBuyModel?
     @State private var picked: PhotosPickerItem?
+    private let source: ShoppingDesignSource?
+    private let decisionID: String?
+    private let onDecision: (Wire.WardrobeDecisionResponse) -> Void
+    private let onContinue: ((String) -> Void)?
+
+    init(
+        source: ShoppingDesignSource? = nil, decisionID: String? = nil,
+        onDecision: @escaping (Wire.WardrobeDecisionResponse) -> Void = { _ in },
+        onContinue: ((String) -> Void)? = nil
+    ) {
+        self.source = source
+        self.decisionID = decisionID
+        self.onDecision = onDecision
+        self.onContinue = onContinue
+    }
 
     var body: some View {
         // ZStack, not Group: the task that creates the model must attach to something.
@@ -26,12 +41,21 @@ struct ShouldIBuyView: View {
                         message: "比平时慢一些。可以稍等一下再看结果。",
                         action: "再看看"
                     ) { Task { await model.resume(candidateID: candidateID) } }
+                case .reviewingLatest:
+                    reviewLatest(model)
                 case let .decided(decision):
-                    DecisionPage(decision: decision, model: model)
+                    DecisionPage(decision: decision, model: model) { conversationID in
+                        if let onContinue { onContinue(conversationID) }
+                        else { app.discussConversation(conversationID) }
+                    }
                 case .unavailable:
-                    notice(title: "暂时用不了", message: "这个功能现在没有开放，晚些时候再来。", action: nil) {}
+                    if model.canRetry {
+                        failed("这个功能暂时用不了。这次的内容已保留，稍后可以直接重试。", model: model)
+                    } else {
+                        notice(title: "暂时用不了", message: "这个功能现在没有开放，晚些时候再来。", action: nil) {}
+                    }
                 case let .failed(message):
-                    notice(title: "这次没问成", message: message, action: "重新开始") { model.startOver() }
+                    failed(message, model: model)
                 }
             }
         }
@@ -39,9 +63,21 @@ struct ShouldIBuyView: View {
         .background(Color.background)
         .navigationTitle("该不该买")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.visible, for: .navigationBar)
         .task {
-            if model == nil { model = ShouldIBuyModel(api: app.api) }
+            let generation = AccountLocalData.generation
             if app.wardrobe.items.isEmpty { await app.wardrobe.load() }
+            guard model == nil, !Task.isCancelled, generation == AccountLocalData.generation else { return }
+            let created = ShouldIBuyModel(api: app.api, source: source, onDecision: onDecision)
+            model = created
+            if let decisionID { await created.replay(decisionID: decisionID) }
+            else {
+                #if DEBUG
+                if ProcessInfo.processInfo.arguments.contains("-AidrobeShoppingDemo") {
+                    await created.ask(about: ImportDemoModifier.samplePhoto())
+                }
+                #endif
+            }
         }
         .onChange(of: picked) { _, item in
             guard let item else { return }
@@ -63,12 +99,17 @@ struct ShouldIBuyView: View {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 VStack(alignment: .leading, spacing: Spacing.control) {
                     Text("购买参考").kicker()
-                    Text("买之前，先问问衣橱")
+                    Text(model.source == nil ? "买之前，先问问衣橱" : "这件适合这次的想法吗？")
                         .font(.display(30, weight: .black, relativeTo: .largeTitle))
                         .foregroundStyle(Color.label)
-                    Text("给一张衣物照片或截图，看看衣橱里有没有能替它的，它又能和什么搭。结论只是参考，买不买你说了算。")
+                    Text(model.source == nil
+                         ? "给一张衣物照片或截图，看看衣橱里有没有能替它的，它又能和什么搭。结论只是参考，买不买你说了算。"
+                         : "给一张想买的衣服照片或截图，结合这次的想法和已有衣橱来看。看完还可以回到原来的对话接着聊。")
                         .font(.body)
                         .foregroundStyle(Color.secondaryLabel)
+                }
+                if let source = model.source {
+                    ShoppingDesignSummary(constraints: source.constraints, title: "带着这些条件看")
                 }
                 VStack(alignment: .leading, spacing: Spacing.control) {
                     SectionHeading(title: "最拿不准的是")
@@ -85,6 +126,7 @@ struct ShouldIBuyView: View {
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
+                .accessibilityIdentifier("shopping.pickPhoto")
                 if !model.history.isEmpty {
                     asked(model)
                 }
@@ -113,7 +155,7 @@ struct ShouldIBuyView: View {
                             .lineLimit(2)
                             .multilineTextAlignment(.leading)
                         Spacer(minLength: Spacing.tight)
-                        if let call = entry.call {
+                        if entry.choiceSynced == true, let call = entry.call {
                             Text(call.title)
                                 .font(.subheadline)
                                 .foregroundStyle(Color.accent)
@@ -124,7 +166,7 @@ struct ShouldIBuyView: View {
                 }
                 .buttonStyle(.plain)
                 .contextMenu {
-                    Button("从这里移除", systemImage: "trash", role: .destructive) { model.forget(entry) }
+                    Button("从本机列表移除", systemImage: "trash", role: .destructive) { model.forget(entry) }
                 }
                 Divider().overlay(Color.separator)
             }
@@ -132,6 +174,61 @@ struct ShouldIBuyView: View {
     }
 
     // MARK: States
+
+    private func failed(_ message: String, model: ShouldIBuyModel) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.section) {
+                Text("这次没问成").font(.display(28, weight: .black, relativeTo: .title))
+                Text(message).foregroundStyle(Color.secondaryLabel)
+                retainedCandidate(model)
+                if model.canRetry {
+                    Button(model.needsLatestDesign ? "读取最新条件" : "重试这次判断") {
+                        Task { await model.retry() }
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier(model.needsLatestDesign ? "shopping.refreshDesign" : "shopping.retry")
+                }
+                Button("换一张图") { model.startOver() }
+                    .buttonStyle(.glass)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.screen)
+        }
+    }
+
+    private func reviewLatest(_ model: ShouldIBuyModel) -> some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: Spacing.section) {
+                Text("这次的条件更新了").font(.display(28, weight: .black, relativeTo: .title))
+                retainedCandidate(model)
+                if let source = model.source {
+                    ShoppingDesignSummary(constraints: source.constraints, title: "现在想要的是")
+                }
+                Text("还是刚才那件衣服。确认后，会按这些条件重新判断。")
+                    .foregroundStyle(Color.secondaryLabel)
+                Button("按这些条件重新看") { Task { await model.evaluateLatest() } }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .accessibilityIdentifier("shopping.evaluateLatest")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(Spacing.screen)
+        }
+    }
+
+    @ViewBuilder private func retainedCandidate(_ model: ShouldIBuyModel) -> some View {
+        if let photo = model.photo {
+            Image(uiImage: photo)
+                .resizable().scaledToFit().frame(maxHeight: 220)
+                .clipShape(.rect(cornerRadius: Radius.card))
+                .accessibilityLabel("已保留的候选衣服")
+        }
+        if let concern = ShoppingCopy.concerns.first(where: { $0.value == model.evaluationConcern }) {
+            Text("你最拿不准的是：\(concern.title)")
+                .font(.subheadline).foregroundStyle(Color.secondaryLabel)
+        }
+    }
 
     private func progress(_ status: String, model: ShouldIBuyModel) -> some View {
         VStack(spacing: Spacing.section) {
@@ -173,6 +270,7 @@ struct ShouldIBuyView: View {
 private struct DecisionPage: View {
     let decision: Wire.WardrobeDecisionResponse
     let model: ShouldIBuyModel
+    let onContinue: (String) -> Void
     @Environment(AppModel.self) private var app
 
     private var similar: [Wire.ComparisonItemModel] { decision.closetComparison.similarItems ?? [] }
@@ -181,13 +279,32 @@ private struct DecisionPage: View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 verdict
+                if let context = decision.designContext {
+                    ShoppingDesignSummary(constraints: context.constraints, title: "当时带来的条件")
+                    if let source = model.source, source.conversationID == context.conversationId,
+                       source.revision != context.revision {
+                        Text("这是按当时的条件留下的判断；对话里已有新的想法。")
+                            .font(.footnote).foregroundStyle(Color.tertiaryLabel)
+                    }
+                }
                 reasons
                 comparison
                 confidence
                 yourCall
-                Button("再问一件") { model.startOver() }
+                if let context = decision.designContext {
+                    Button("回到对话接着聊", systemImage: "text.bubble") { onContinue(context.conversationId) }
+                        .buttonStyle(.glassProminent)
+                        .controlSize(.large)
+                        .disabled(model.isSavingChoice)
+                        .accessibilityIdentifier("shopping.continue")
+                    Text("这次的判断已记在原来的对话里，继续聊时不用再说一遍。")
+                        .font(.footnote).foregroundStyle(Color.tertiaryLabel)
+                }
+                Button(model.source == nil ? "再问一件" : "按当前条件再问一件") { model.startOver() }
                     .buttonStyle(.glass)
                     .controlSize(.large)
+                    .disabled(model.isSavingChoice)
+                    .accessibilityIdentifier("shopping.startOver")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)
@@ -218,6 +335,7 @@ private struct DecisionPage: View {
             Text(decision.decisionText)
                 .font(.display(26, weight: .black, relativeTo: .title))
                 .foregroundStyle(Color.label)
+                .accessibilityIdentifier("shopping.result")
         }
     }
 
@@ -298,6 +416,19 @@ private struct DecisionPage: View {
                 Divider().overlay(Color.separator)
                 FactRow(title: "这个判断") { Text(ShoppingCopy.uncertainty(decision.uncertainty)) }
             }
+            if let context = decision.designContext {
+                if let dimensions = context.evaluatedDimensions, !dimensions.isEmpty {
+                    Text("这次已核对：\(dimensions.map(ShoppingCopy.evaluatedDimension).joined(separator: "、"))。")
+                        .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                }
+                if let dimensions = context.unverifiedDimensions, !dimensions.isEmpty {
+                    SectionHeading(title: "还不能确认的部分")
+                    ForEach(Array(Set(dimensions)).sorted(), id: \.self) { dimension in
+                        Text(ShoppingCopy.unverifiedDimension(dimension))
+                            .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                    }
+                }
+            }
             Text(decision.boundaryNote)
                 .font(.footnote)
                 .foregroundStyle(Color.tertiaryLabel)
@@ -310,15 +441,74 @@ private struct DecisionPage: View {
             FlowLayout {
                 ForEach(AskedPurchase.Call.allCases, id: \.self) { call in
                     Chip(title: call.title, isSelected: model.call(for: decision.id) == call) {
-                        model.setCall(model.call(for: decision.id) == call ? nil : call, for: decision.id)
+                        Task { await model.setCall(model.call(for: decision.id) == call ? nil : call, for: decision.id) }
                     }
+                    .disabled(model.isSavingChoice)
+                    .accessibilityIdentifier("shopping.choice.\(call.rawValue)")
                 }
             }
-            Text("只记在这台手机上，方便你回头看。")
+            if model.isSavingChoice {
+                ProgressView("正在记下你的决定…")
+            } else if let failure = model.choiceFailure {
+                Text(failure).font(.footnote).foregroundStyle(Color.secondaryLabel)
+                Button("重新保存选择") { Task { await model.retryChoice() } }
+                    .buttonStyle(.glass)
+                    .accessibilityIdentifier("shopping.choice.retry")
+            } else if let call = model.call(for: decision.id) {
+                Text("已记下：\(call.title)")
+                    .font(.footnote).foregroundStyle(Color.secondaryLabel)
+                    .accessibilityIdentifier("shopping.choice.saved")
+            }
+            Text("选择会保存在这次判断里，之后还可以改。打算买只记录想法，这件衣服还不会加入衣橱。")
                 .font(.footnote)
                 .foregroundStyle(Color.tertiaryLabel)
         }
         .sensoryFeedback(.selection, trigger: model.call(for: decision.id))
+    }
+}
+
+/// Read-only, user-facing conditions. Shopping snapshots never edit the brief
+/// and never turn an unowned candidate into a wardrobe garment.
+struct ShoppingDesignSummary: View {
+    let constraints: Wire.StylingConstraints
+    let title: String
+    @Environment(AppModel.self) private var app
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: Spacing.tight) {
+            SectionHeading(title: title)
+            if let goal = constraints.goal, !goal.isEmpty { Text(goal) }
+            if let style = constraints.targetStyle, !style.isEmpty, style != constraints.goal {
+                Text("想尝试：\(StylingText.styles(style))")
+            }
+            if let scene = constraints.scene?.rawValue {
+                Text("场合：\(ShoppingCopy.scene(scene))")
+            }
+            if let day = constraints.targetDate, let date = Garment.day(day) {
+                Text("计划在\(date)穿")
+            }
+            if let ids = constraints.lockedItemIds, !ids.isEmpty {
+                Text("保留：\(names(ids))")
+            }
+            if let ids = constraints.excludedItemIds, !ids.isEmpty {
+                Text("这次不用：\(names(ids))")
+            }
+            ForEach(Array((constraints.notes ?? []).enumerated()), id: \.offset) { _, note in
+                Text(note)
+            }
+            if constraints.inspirationId != nil { Text("带有这次的灵感来源。") }
+            if constraints.exploration == true || !(constraints.preferenceOverrides ?? []).isEmpty {
+                Text("这是这次的尝试，长期偏好仍然保留。")
+            }
+        }
+        .font(.subheadline)
+        .foregroundStyle(Color.secondaryLabel)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier("shopping.designContext")
+    }
+
+    private func names(_ ids: [String]) -> String {
+        ids.map { app.wardrobe.item($0)?.displayName ?? "当时选定的衣物" }.joined(separator: "、")
     }
 }
 
@@ -330,6 +520,41 @@ enum ShoppingCopy {
         (.scene, "有没有场合穿"),
         (.volume, "版型和宽松度"),
     ]
+
+    static func scene(_ value: String) -> String {
+        switch value {
+        case "commute": "通勤"
+        case "formal": "正式场合"
+        case "casual": "日常休闲"
+        case "date": "约会"
+        case "travel": "出门旅行"
+        default: value
+        }
+    }
+
+    static func evaluatedDimension(_ value: String) -> String {
+        switch value {
+        case "owned_items": "已有衣物"
+        case "locked_items": "本次保留的单品"
+        case "excluded_items": "本次排除的单品"
+        case "scene_evidence": "已有单品的场合标签和穿着记录"
+        case "supporting_item_style_tags": "可搭单品已有的风格标签"
+        default: "其他已记录的条件"
+        }
+    }
+
+    static func unverifiedDimension(_ value: String) -> String {
+        switch value {
+        case "size_and_fit": "图片无法确认尺码和上身是否合适。"
+        case "price_and_budget": "尚未核对价格与预算。"
+        case "target_date_weather": "未查询计划当天的天气。"
+        case "candidate_style": "候选衣服是否符合目标风格，还需进一步确认。"
+        case "reference_visual_similarity": "还没有对比候选与灵感图的视觉相似性。"
+        case "free_text_goals_and_notes": "你的目标和补充说明已保留，其中的细节尚未逐项核验。"
+        case "preference_overrides": "这次放宽的偏好已保留，尚未逐项核对。"
+        default: "还有部分条件尚未核验，结论仅供参考。"
+        }
+    }
 
     static func uncertainty(_ level: Wire.WardrobeDecisionResponse.UncertaintyPayload) -> String {
         switch level {
