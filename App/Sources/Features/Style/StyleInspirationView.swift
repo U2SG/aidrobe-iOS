@@ -145,6 +145,11 @@ struct StyleInspirationView: View {
             if let raw = item.sourceUrl, let url = publicURL(raw) {
                 Link("打开来源", destination: url).font(.footnote)
             }
+            if item.sourceType == "inspiration_image", item.imageUrl != nil {
+                Button("从这张图开始设计") { app.discussInspiration(item) }
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .contextMenu {

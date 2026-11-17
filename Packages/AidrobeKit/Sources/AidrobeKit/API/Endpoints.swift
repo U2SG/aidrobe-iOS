@@ -42,6 +42,17 @@ public enum Endpoints {
         )
     }
 
+    public static func wearFeedback(outfitID: String) -> Endpoint<Wire.WearFeedbackSnapshot> {
+        Endpoint(.get, "/v1/recommendations/outfits/\(outfitID)/wear-feedback")
+    }
+
+    public static func saveWearFeedback(
+        outfitID: String,
+        feedback: Wire.WearFeedbackRecord
+    ) throws -> Endpoint<Wire.WearFeedbackSnapshot> {
+        try Endpoint(.put, "/v1/recommendations/outfits/\(outfitID)/wear-feedback", json: feedback)
+    }
+
     public static let todayContextTextLimit = 200
 
     public static func refreshToday(

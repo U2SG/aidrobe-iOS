@@ -104,7 +104,7 @@ struct PackingListsView: View {
     }
 }
 
-private struct TripRow: View {
+struct TripRow: View {
     let list: Wire.PackingListResponse
 
     var body: some View {
@@ -133,16 +133,29 @@ private struct TripRow: View {
 }
 
 /// Where, how long, and what for. The backend builds the list on create.
-private struct NewTripSheet: View {
+struct NewTripSheet: View {
     let model: PackingModel
+    let source: PackingDesignSource?
     let onCreated: (String) -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var destination = ""
-    @State private var days = 3
+    @State private var days: Int
     @State private var hasDate = false
     @State private var departure = Date.now
     @State private var scenes: Set<String> = ["casual"]
     @State private var weather = ""
+    @State private var lastRequest: Wire.CreatePackingListRequest?
+    @State private var requestID = UUID().uuidString
+
+    init(
+        model: PackingModel, source: PackingDesignSource? = nil,
+        suggestedDays: Int? = nil, onCreated: @escaping (String) -> Void
+    ) {
+        self.model = model
+        self.source = source
+        self.onCreated = onCreated
+        _days = State(initialValue: suggestedDays.map { min(14, max(1, $0)) } ?? 3)
+    }
 
     var body: some View {
         NavigationStack {
@@ -180,32 +193,47 @@ private struct NewTripSheet: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("取消", role: .cancel) { dismiss() }
+                        .disabled(model.isCreating)
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     if model.isCreating {
                         ProgressView()
                     } else {
-                        Button("排出来") {
-                            Task {
-                                let id = await model.create(
-                                    destination: destination,
-                                    days: days,
-                                    departure: hasDate ? departure : nil,
-                                    scenes: PackingCopy.scenes.map(\.key).filter(scenes.contains),
-                                    weather: weather
-                                )
-                                if let id {
-                                    dismiss()
-                                    onCreated(id)
-                                }
-                            }
-                        }
-                        .disabled(scenes.isEmpty)
+                        Button("排出来", action: submit)
+                            .disabled(scenes.isEmpty)
                     }
                 }
             }
             .toast(Binding(get: { model.notice }, set: { model.notice = $0 }))
         }
         .presentationDetents([.large])
+        .interactiveDismissDisabled(model.isCreating)
+    }
+
+    private func submit() {
+        let place = destination.trimmingCharacters(in: .whitespaces)
+        let hint = weather.trimmingCharacters(in: .whitespaces)
+        var request = Wire.CreatePackingListRequest(
+            destination: place.isEmpty ? nil : place,
+            days: days,
+            scenes: PackingCopy.scenes.map(\.key).filter(scenes.contains),
+            weatherHint: hint.isEmpty ? nil : hint,
+            departureDate: hasDate ? PackingModel.calendarDay(departure) : nil
+        )
+        if let source {
+            request.conversationId = source.conversationID
+            request.expectedRevision = source.revision
+            if request != lastRequest {
+                lastRequest = request
+                requestID = UUID().uuidString
+            }
+            request.requestId = requestID
+        }
+        Task { [request] in
+            if let id = await model.create(request) {
+                dismiss()
+                onCreated(id)
+            }
+        }
     }
 }

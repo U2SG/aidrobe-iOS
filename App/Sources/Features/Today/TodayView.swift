@@ -419,19 +419,26 @@ private struct TodayPage: View {
     // MARK: Actions
 
     private var actionBar: some View {
-        GlassEffectContainer(spacing: Spacing.tight) {
+        let refreshLabel = model.outfits.count > 1 ? "换一套" : "重新搭"
+        return GlassEffectContainer(spacing: Spacing.tight) {
             HStack(spacing: Spacing.tight) {
                 Button {
                     Task { await another() }
                 } label: {
-                    if model.isRefreshing {
-                        ProgressView().frame(width: 72)
-                    } else {
-                        Text(model.outfits.count > 1 ? "换一套" : "重新搭")
-                    }
+                    Text(refreshLabel)
+                        .opacity(model.isRefreshing ? 0 : 1)
+                        .overlay {
+                            if model.isRefreshing {
+                                ProgressView()
+                                    .controlSize(.small)
+                                    .accessibilityHidden(true)
+                            }
+                        }
                 }
                 .buttonStyle(.glass)
                 .disabled(model.isRefreshing)
+                .accessibilityLabel(Text(refreshLabel))
+                .accessibilityValue(model.isRefreshing ? Text("正在搭配") : Text(""))
 
                 if isWorn {
                     Button {
