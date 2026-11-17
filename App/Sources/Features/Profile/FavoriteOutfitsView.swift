@@ -17,13 +17,14 @@ struct FavoriteOutfitsView: View {
         .navigationDestination(for: Wire.OutfitResponse.self) { outfit in
             if let model { FavoriteOutfitDetailView(outfit: outfit, model: model) }
         }
-        .task {
+        .task(id: app.favoritesChange) {
             if model == nil {
                 model = FavoriteOutfitsModel(
-                    api: app.api, wardrobe: app.wardrobe, onFavoritesChange: app.favoritesDidChange
+                    api: app.api, wardrobe: app.wardrobe,
+                    favoritesChange: { app.favoritesChange }, onFavoritesChange: app.favoritesDidChange
                 )
             }
-            // Reset the offset after returning from a detail where a favorite may have been removed.
+            // Re-read after a mutation, including one that finishes after this screen appears.
             await model?.load()
         }
     }
@@ -157,7 +158,7 @@ private struct FavoriteOutfitDetailView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button(isFavorite ? "取消收藏" : "收藏这套", systemImage: isFavorite ? "heart.fill" : "heart") {
-                    Task { await model.toggleFavorite(outfit) }
+                    Task { await actions.toggleFavorite(outfit) }
                 }
                 .disabled(favoriteReadID != nil || actions.changingFavorites.contains(outfit.outfitId))
                 Button("分享这套", systemImage: "square.and.arrow.up") {
@@ -227,35 +228,45 @@ private final class FavoriteOutfitsModel {
 
     private let api: APIClient
     private let wardrobe: WardrobeStore
+    private let currentFavoritesChange: () -> UUID
     private let accountGeneration = AccountLocalData.generation
     private var loadID = UUID()
     private var offset = 0
 
-    init(api: APIClient, wardrobe: WardrobeStore, onFavoritesChange: @escaping () -> Void) {
+    init(
+        api: APIClient, wardrobe: WardrobeStore,
+        favoritesChange: @escaping () -> UUID, onFavoritesChange: @escaping () -> Void
+    ) {
         self.api = api
         self.wardrobe = wardrobe
+        currentFavoritesChange = favoritesChange
         actions = TodayModel(api: api, wardrobe: wardrobe, onFavoritesChange: onFavoritesChange)
     }
 
     func load() async {
-        guard accountGeneration == AccountLocalData.generation else { return }
+        guard !Task.isCancelled, accountGeneration == AccountLocalData.generation else { return }
         let requestID = UUID()
+        let change = currentFavoritesChange()
         loadID = requestID
         isRefreshing = true
+        isLoadingMore = false
+        // A mutation can shift every offset; a failed refresh must not reuse the old one.
+        offset = 0
+        hasMore = false
         if items.isEmpty { phase = .loading }
         defer { if loadID == requestID { isRefreshing = false } }
         do {
             async let firstPage = api.send(Endpoints.favoriteOutfits())
             async let wardrobeLoad: Void = wardrobe.items.isEmpty ? wardrobe.load() : ()
             let (page, _) = try await (firstPage, wardrobeLoad)
-            guard isCurrent(requestID) else { return }
+            guard isCurrent(requestID, favoritesChange: change) else { return }
             items = page.items
             offset = page.offset + page.items.count
             hasMore = page.hasMore
             for outfit in items { actions.syncOutfit(outfit) }
             phase = .loaded
         } catch {
-            guard isCurrent(requestID) else { return }
+            guard isCurrent(requestID, favoritesChange: change) else { return }
             if items.isEmpty { phase = .failed(userMessage(for: error)) }
             else { notice = userMessage(for: error) }
         }
@@ -264,28 +275,24 @@ private final class FavoriteOutfitsModel {
     func loadMore() async {
         guard hasMore, !isRefreshing, !isLoadingMore else { return }
         let requestID = loadID
+        let change = currentFavoritesChange()
         isLoadingMore = true
-        defer { isLoadingMore = false }
+        defer { if loadID == requestID { isLoadingMore = false } }
         do {
             let page = try await api.send(Endpoints.favoriteOutfits(offset: offset))
-            guard isCurrent(requestID) else { return }
+            guard isCurrent(requestID, favoritesChange: change) else { return }
             let known = Set(items.map(\.outfitId))
             items += page.items.filter { !known.contains($0.outfitId) }
             offset = page.offset + page.items.count
             hasMore = page.hasMore
             for outfit in page.items { actions.syncOutfit(outfit) }
         } catch {
-            if isCurrent(requestID) { notice = userMessage(for: error) }
+            if isCurrent(requestID, favoritesChange: change) { notice = userMessage(for: error) }
         }
     }
 
-    func toggleFavorite(_ outfit: Wire.OutfitResponse) async {
-        guard await actions.toggleFavorite(outfit) else { return }
-        // Removing a row shifts offset pagination; rebuild from the first page.
-        await load()
-    }
-
-    private func isCurrent(_ requestID: UUID) -> Bool {
-        loadID == requestID && accountGeneration == AccountLocalData.generation && !Task.isCancelled
+    private func isCurrent(_ requestID: UUID, favoritesChange: UUID) -> Bool {
+        loadID == requestID && currentFavoritesChange() == favoritesChange &&
+            accountGeneration == AccountLocalData.generation && !Task.isCancelled
     }
 }
