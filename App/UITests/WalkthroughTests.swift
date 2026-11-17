@@ -217,10 +217,12 @@ final class WalkthroughTests: XCTestCase {
 
     func testMainLine() {
         launch(onboarded: true)
-        XCTAssert(app.buttons["就穿这套"].waitForExistence(timeout: 60) || app.buttons["说说穿着感受"].exists)
+        XCTAssert(app.buttons["today.markWorn"].waitForExistence(timeout: 60) || app.buttons["说说穿着感受"].exists)
         settle()
         shot("02-today")
         app.swipeUp()
+        let reasons = app.buttons["today.reasons"]
+        if reasons.isHittable { reasons.tap() }
         shot("03-today-reasons")
         app.swipeDown()
 
@@ -229,6 +231,13 @@ final class WalkthroughTests: XCTestCase {
         shot("04-today-context")
         app.swipeDown(velocity: .fast)
 
+        let pieces = app.buttons["today.pieces"]
+        for _ in 0..<3 {
+            if pieces.isHittable { break }
+            app.swipeUp()
+        }
+        XCTAssert(pieces.isHittable)
+        pieces.tap()
         app.buttons.matching(NSPredicate(format: "label CONTAINS '换一件'")).firstMatch.tap()
         settle(3)
         shot("05-today-swap")
@@ -334,8 +343,8 @@ final class WalkthroughTests: XCTestCase {
     /// Records a wear, so it changes dev data; kept apart from the read-only walk.
     func testWearToday() {
         launch(onboarded: true)
-        guard app.buttons["就穿这套"].waitForExistence(timeout: 60) else { return }
-        app.buttons["就穿这套"].tap()
+        guard app.buttons["today.markWorn"].waitForExistence(timeout: 60) else { return }
+        app.buttons["today.markWorn"].tap()
         XCTAssert(app.buttons["说说穿着感受"].waitForExistence(timeout: 15))
         settle()
         shot("13-today-worn")
@@ -367,3 +376,4 @@ final class WalkthroughTests: XCTestCase {
         }
     }
 }
+

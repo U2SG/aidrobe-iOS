@@ -108,6 +108,8 @@ private struct TodayPage: View {
     @State private var showsContext = false
     @State private var shareDraft: OutfitShareDraft?
     @State private var showPieces: Set<String> = []
+    @State private var showsGarmentDetails = false
+    @State private var showsReasons = false
 
     private var outfit: Wire.OutfitResponse {
         model.outfits.first { $0.outfitId == currentID } ?? model.outfits[0]
@@ -168,7 +170,7 @@ private struct TodayPage: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: Spacing.control) {
             HStack(alignment: .bottom) {
-                TodayHeader(title: isWorn ? "今天就这套" : "今天穿这套")
+                TodayHeader(title: isWorn ? "今天就这套" : "今天怎么穿")
                 Spacer()
                 Button {
                     showsContext = true
@@ -273,11 +275,38 @@ private struct TodayPage: View {
     private func outfitImageActions(_ outfit: Wire.OutfitResponse) -> some View {
         let id = outfit.outfitId
         if model.generatedImages[id] != nil {
-            let previewIsOpen = showPieces.contains(id)
-            Button(previewIsOpen ? "返回整套搭配图" : "看单品拼图") {
-                if !showPieces.insert(id).inserted { showPieces.remove(id) }
+            HStack(spacing: Spacing.control) {
+                Picker("搭配图片", selection: Binding(
+                    get: { showPieces.contains(id) },
+                    set: { if $0 { showPieces.insert(id) } else { showPieces.remove(id) } }
+                )) {
+                    Text("整套图").tag(false)
+                    Text("看单品").tag(true)
+                }
+                .pickerStyle(.segmented)
+                .accessibilityIdentifier("today.imagePresentation")
+                Menu {
+                    Button("获取最新整套图", systemImage: "arrow.clockwise") {
+                        Task { await model.generateImage(for: outfit) }
+                    }
+                    .disabled(model.generatingOutfits.contains(id))
+                } label: {
+                    Image(systemName: "ellipsis")
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+                .accessibilityLabel("搭配图片操作")
             }
-            .font(.footnote)
+            if model.generatingOutfits.contains(id) {
+                ProgressView("正在更新整套图…")
+                    .font(.footnote)
+            }
+            if let issue = model.outfitImageIssues[id] {
+                Text(issue)
+                    .font(.footnote)
+                    .foregroundStyle(Color.secondaryLabel)
+            }
         } else if model.generatingOutfits.contains(id) {
             ProgressView("正在准备整套搭配图…")
                 .font(.footnote)
@@ -339,35 +368,36 @@ private struct TodayPage: View {
     // MARK: Sections
 
     private var pieces: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            SectionHeading(title: "这一套")
-                .padding(.bottom, 4)
-            ForEach(model.boardItems(for: outfit)) { item in
-                Button {
-                    swapTarget = SwapTarget(outfit: outfit, slot: item)
-                } label: {
-                    HStack(spacing: Spacing.row) {
-                        Text(Garment.category(item.role))
-                            .font(.subheadline)
-                            .foregroundStyle(Color.tertiaryLabel)
-                            .frame(width: 52, alignment: .leading)
-                        Text(item.name)
-                            .font(.body)
-                            .foregroundStyle(Color.label)
-                            .lineLimit(1)
-                        Spacer(minLength: Spacing.tight)
-                        Text("换一件")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.tertiaryLabel)
+        DisclosureGroup("这套的 \(outfit.items.count) 件衣服", isExpanded: $showsGarmentDetails) {
+            VStack(alignment: .leading, spacing: 0) {
+                ForEach(model.boardItems(for: outfit)) { item in
+                    Button {
+                        swapTarget = SwapTarget(outfit: outfit, slot: item)
+                    } label: {
+                        HStack(spacing: Spacing.row) {
+                            Text(Garment.category(item.role))
+                                .font(.subheadline)
+                                .foregroundStyle(Color.tertiaryLabel)
+                                .frame(width: 52, alignment: .leading)
+                            Text(item.name)
+                                .font(.body)
+                                .foregroundStyle(Color.label)
+                            Spacer(minLength: Spacing.tight)
+                            Text("换一件")
+                                .font(.subheadline)
+                                .foregroundStyle(Color.secondaryLabel)
+                        }
+                        .frame(minHeight: 48)
+                        .contentShape(.rect)
                     }
-                    .frame(minHeight: 48)
-                    .contentShape(.rect)
+                    .buttonStyle(.plain)
+                    .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
+                    Divider().overlay(Color.separator)
                 }
-                .buttonStyle(.plain)
-                .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
-                Divider().overlay(Color.separator)
             }
         }
+        .tint(Color.secondaryLabel)
+        .accessibilityIdentifier("today.pieces")
     }
 
     @ViewBuilder private var reasons: some View {
@@ -377,33 +407,36 @@ private struct TodayPage: View {
         let remembered = reasoning.filter { $0._type == "feedback" }
         let others = reasoning.filter { $0._type != "feedback" }.prefix(3)
         if !reasoning.isEmpty {
-            VStack(alignment: .leading, spacing: Spacing.control) {
-                SectionHeading(title: "为什么是这套")
-                ForEach(Array(remembered.enumerated()), id: \.offset) { _, reason in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text("记得你说过")
-                            .font(.caption.weight(.medium))
-                            .kerning(1.5)
-                            .foregroundStyle(Color.accent)
-                        Text(reason.text)
-                            .font(.body)
-                            .foregroundStyle(Color.label)
+            DisclosureGroup("为什么是这套", isExpanded: $showsReasons) {
+                VStack(alignment: .leading, spacing: Spacing.control) {
+                    ForEach(Array(remembered.enumerated()), id: \.offset) { _, reason in
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("记得你说过")
+                                .font(.caption.weight(.medium))
+                                .kerning(1.5)
+                                .foregroundStyle(Color.accent)
+                            Text(reason.text)
+                                .font(.body)
+                                .foregroundStyle(Color.label)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(Spacing.row)
+                        .background(Color.accentSoft, in: .rect(cornerRadius: Radius.tile))
                     }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(Spacing.row)
-                    .background(Color.accentSoft, in: .rect(cornerRadius: Radius.tile))
-                }
-                ForEach(Array(others.enumerated()), id: \.offset) { index, reason in
-                    HStack(alignment: .firstTextBaseline, spacing: Spacing.control) {
-                        Text("0\(index + 1)")
-                            .font(.display(15, weight: .regular, relativeTo: .subheadline))
-                            .foregroundStyle(Color.accent)
-                        Text(reason.text)
-                            .font(.body)
-                            .foregroundStyle(Color.secondaryLabel)
+                    ForEach(Array(others.enumerated()), id: \.offset) { index, reason in
+                        HStack(alignment: .firstTextBaseline, spacing: Spacing.control) {
+                            Text("0\(index + 1)")
+                                .font(.display(15, weight: .regular, relativeTo: .subheadline))
+                                .foregroundStyle(Color.accent)
+                            Text(reason.text)
+                                .font(.body)
+                                .foregroundStyle(Color.secondaryLabel)
+                        }
                     }
                 }
             }
+            .tint(Color.secondaryLabel)
+            .accessibilityIdentifier("today.reasons")
         }
     }
 
@@ -458,9 +491,12 @@ private struct TodayPage: View {
                     Button {
                         Task { await model.markWorn(outfit) }
                     } label: {
-                        Text("就穿这套").fontWeight(.semibold).frame(maxWidth: .infinity)
+                        Text("今天穿了这套").fontWeight(.semibold).frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.glassProminent)
+                    .disabled(model.needsLatestVersion || model.isRevising || model.isRefreshing)
+                    .accessibilityIdentifier("today.markWorn")
+                    .accessibilityHint("记录今天实际穿过这套衣服")
 
                     Button {
                         feedbackOutfit = outfit
@@ -571,3 +607,4 @@ struct OutfitBoard: View {
         }
     }
 }
+

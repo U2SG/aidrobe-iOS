@@ -11,6 +11,7 @@ struct AskView<Tools: View>: View {
     @State private var tripSource: PackingDesignSource?
     @State private var shopping: AskShoppingPresentation?
     @State private var purchaseToReveal: (conversationID: String, decisionID: String)?
+    @State private var showsCurrentOutfit = true
     @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
     @FocusState private var isTyping: Bool
     private let tools: Tools
@@ -133,6 +134,10 @@ struct AskView<Tools: View>: View {
                         }
                     }
                 }
+                if model.styling != nil || model.designBrief != nil {
+                    currentDesign(model)
+                        .id(AskScrollTarget.currentOutfit)
+                }
                 ForEach(timeline(for: model)) { item in
                     switch item {
                     case let .turn(entry):
@@ -144,30 +149,6 @@ struct AskView<Tools: View>: View {
                     case let .purchase(decision):
                         savedPurchase(decision, model: model)
                             .id(item.id)
-                    }
-                }
-                if model.needsOutfitUpdate, model.styling != nil {
-                    VStack(alignment: .leading, spacing: Spacing.control) {
-                        SectionHeading(title: "待应用的新条件")
-                        DesignConditions(model: model)
-                    }
-                }
-                if let styling = model.styling {
-                    StylingCard(model: model, styling: styling, onPacking: {
-                        isTyping = false
-                        tripSource = PackingDesignSource(
-                            conversationID: styling.conversationId,
-                            revision: model.expectedRevision ?? styling.revision
-                        )
-                    })
-                    .id(styling.outfit.outfitId)
-                } else if model.designBrief != nil {
-                    VStack(alignment: .leading, spacing: Spacing.row) {
-                        SectionHeading(title: model.needsOutfitUpdate ? "待应用的新条件" : "条件已记下")
-                        DesignConditions(model: model)
-                        Text("继续聊聊，按这些条件生成方案后再采用。")
-                            .font(.subheadline)
-                            .foregroundStyle(Color.secondaryLabel)
                     }
                 }
                 if model.shoppingSource != nil {
@@ -195,10 +176,58 @@ struct AskView<Tools: View>: View {
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
         }
+        .onChange(of: isTyping) { _, typing in
+            if typing { showsCurrentOutfit = false }
+        }
         .safeAreaBar(edge: .bottom) { inputBar(model) }
         .scrollEdgeEffectStyle(.hard, for: .bottom)
         .toast($model.notice)
         .toast($actions.notice)
+    }
+
+    private func currentDesign(_ model: AskModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.row) {
+            if model.needsOutfitUpdate || model.styling == nil {
+                VStack(alignment: .leading, spacing: Spacing.control) {
+                    SectionHeading(title: model.needsOutfitUpdate ? "待应用的新条件" : "条件已记下")
+                    DesignConditions(model: model)
+                    Button(model.styling == nil ? "按这些要求搭一套" : "按这些要求重搭", systemImage: "arrow.triangle.2.circlepath") {
+                        send("请按刚才记下的最新条件，生成一套可以采用的新搭配。", model)
+                    }
+                    .buttonStyle(.glassProminent)
+                    .controlSize(.large)
+                    .disabled(!model.canAsk)
+                    .accessibilityIdentifier("ask.applyConditions")
+                }
+            }
+            if let styling = model.styling {
+                DisclosureGroup(isExpanded: $showsCurrentOutfit) {
+                    StylingCard(model: model, styling: styling, onPacking: {
+                        isTyping = false
+                        tripSource = PackingDesignSource(
+                            conversationID: styling.conversationId,
+                            revision: model.expectedRevision ?? styling.revision
+                        )
+                    })
+                    .id(styling.outfit.outfitId)
+                    .padding(.top, Spacing.row)
+                } label: {
+                    VStack(alignment: .leading, spacing: Spacing.tight) {
+                        Text(model.needsOutfitUpdate ? "上一套搭配" : "当前这一套").kicker()
+                        HStack(alignment: .firstTextBaseline) {
+                            Text(styling.outfit.title)
+                                .font(.display(24, relativeTo: .title2))
+                                .foregroundStyle(Color.label)
+                            Spacer(minLength: Spacing.tight)
+                            Text("第\(styling.revision)版")
+                                .font(.caption.monospacedDigit())
+                                .foregroundStyle(Color.tertiaryLabel)
+                        }
+                    }
+                }
+                .accessibilityIdentifier("ask.currentOutfit")
+            }
+        }
     }
 
     private func timeline(for model: AskModel) -> [AskTimelineItem] {
@@ -377,6 +406,27 @@ struct AskView<Tools: View>: View {
 
     private func inputBar(_ model: AskModel) -> some View {
         VStack(alignment: .leading, spacing: Spacing.tight) {
+            if model.styling != nil || model.designBrief != nil {
+                Button {
+                    isTyping = false
+                    showsCurrentOutfit = true
+                    scrollPosition.scrollTo(id: AskScrollTarget.currentOutfit, anchor: .top)
+                } label: {
+                    HStack(spacing: Spacing.tight) {
+                        Label(
+                            model.needsOutfitUpdate ? "新要求待应用" : (model.styling == nil ? "这次的要求" : "当前这一套"),
+                            systemImage: "hanger"
+                        )
+                        Spacer(minLength: Spacing.tight)
+                        Image(systemName: "chevron.up")
+                    }
+                    .font(.subheadline)
+                    .frame(minHeight: 44)
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glass)
+                .accessibilityIdentifier("ask.showCurrentOutfit")
+            }
             if model.hasUnresolvedQuestion {
                 Text("上一句还没确认结果。请重试那一句，或开启新对话后再聊。")
                     .font(.footnote)
@@ -443,6 +493,7 @@ private struct AskShoppingPresentation: Identifiable {
 }
 
 private enum AskScrollTarget: Hashable, Sendable {
+    case currentOutfit
     case turn(UUID)
     case packingList(String)
     case purchase(String)
@@ -493,6 +544,7 @@ private struct StylingCard: View {
     let onPacking: () -> Void
     @State private var swapTarget: StylingSwapTarget?
     @State private var showPieces = false
+    @State private var showsWearFeedback = false
 
     private var outfit: Wire.OutfitResponse { styling.outfit }
     private var actions: TodayModel { model.outfitActions }
@@ -511,26 +563,11 @@ private struct StylingCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: Spacing.row) {
-            SectionHeading(title: model.needsOutfitUpdate ? "上一套搭配" : "这一套")
             if model.needsOutfitUpdate {
-                Text("新条件还没有应用到这一套。继续聊聊，生成新方案后再采用。")
+                Text("新要求还没有应用，下面仍是上一套。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
-            HStack(alignment: .firstTextBaseline) {
-                Text(outfit.title)
-                    .font(.display(24, relativeTo: .title2))
-                    .foregroundStyle(Color.label)
-                Spacer(minLength: Spacing.tight)
-                Text("第\(styling.revision)版")
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(Color.tertiaryLabel)
-            }
-            Button("出行打包", systemImage: "suitcase", action: onPacking)
-                .buttonStyle(.glass)
-                .controlSize(.large)
-                .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate)
-            WearFeedbackButton(model: model, styling: styling)
             if !showPieces, let image = actions.generatedImages[outfit.outfitId] {
                 GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
                     .accessibilityHidden(false)
@@ -541,11 +578,6 @@ private struct StylingCard: View {
                 }
             }
             imageAction
-            Text(outfit.reason)
-                .font(.body)
-                .foregroundStyle(Color.secondaryLabel)
-            if !model.needsOutfitUpdate { DesignConditions(model: model) }
-            pieces
             if model.isUpdatingDesign { ProgressView("正在保存修改…") }
             if let failure = model.actionFailure {
                 Text(failure).font(.subheadline).foregroundStyle(Color.secondaryLabel)
@@ -565,7 +597,22 @@ private struct StylingCard: View {
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
                 .disabled(model.isBusy || model.needsLatestVersion || model.needsOutfitUpdate || styling.status == .adopted)
+                .accessibilityIdentifier("ask.adoptOutfit")
                 Menu {
+                    Button("出行打包", systemImage: "suitcase", action: onPacking)
+                        .disabled(model.needsLatestVersion || model.needsOutfitUpdate)
+                    Button(
+                        model.hasWearFeedback(for: styling) ? "修改穿着感受" : "记录穿着感受",
+                        systemImage: "square.and.pencil"
+                    ) { showsWearFeedback = true }
+                    .accessibilityIdentifier("ask.wearFeedback")
+                    if actions.generatedImages[outfit.outfitId] != nil {
+                        Button("获取最新整套图", systemImage: "arrow.clockwise") {
+                            Task { await actions.generateImage(for: outfit) }
+                        }
+                        .disabled(actions.generatingOutfits.contains(outfit.outfitId))
+                    }
+                    Divider()
                     Button(
                         actions.favoriteOutfitIDs.contains(outfit.outfitId) ? "取消收藏" : "收藏这套",
                         systemImage: "heart"
@@ -585,7 +632,19 @@ private struct StylingCard: View {
                 .buttonBorderShape(.circle)
                 .disabled(model.isBusy)
                 .accessibilityLabel("这套搭配的操作")
+                .accessibilityIdentifier("ask.outfitActions")
             }
+            pieces
+            DisclosureGroup("搭配依据与要求") {
+                VStack(alignment: .leading, spacing: Spacing.control) {
+                    Text(outfit.reason)
+                        .font(.body)
+                        .foregroundStyle(Color.secondaryLabel)
+                    if !model.needsOutfitUpdate { DesignConditions(model: model) }
+                }
+                .padding(.top, Spacing.tight)
+            }
+            .font(.subheadline)
         }
         .task(id: outfit.outfitId) { await actions.loadGeneratedImage(for: outfit.outfitId) }
         .sheet(item: $swapTarget) { target in
@@ -594,20 +653,28 @@ private struct StylingCard: View {
                 onRevision: model.acceptRevision, onConflict: { await model.restoreCurrent() }
             )
         }
+        .sheet(isPresented: $showsWearFeedback) {
+            DesignFeedbackSheet(styling: styling, model: model)
+        }
     }
 
     @ViewBuilder private var imageAction: some View {
         let id = outfit.outfitId
         if actions.generatedImages[id] != nil {
-            Button(showPieces ? "看整套效果" : "看单品拼图") { showPieces.toggle() }
-                .font(.footnote)
-        } else if actions.generatingOutfits.contains(id) {
-            ProgressView("正在准备整套图…").font(.footnote)
-        } else {
-            if let issue = actions.outfitImageIssues[id] {
-                Text(issue).font(.footnote).foregroundStyle(Color.secondaryLabel)
+            Picker("搭配展示", selection: $showPieces) {
+                Text("整套图").tag(false)
+                Text("看单品").tag(true)
             }
-            Button("看一下整套效果", systemImage: "sparkles") {
+            .pickerStyle(.segmented)
+            .accessibilityIdentifier("ask.imageMode")
+        }
+        if actions.generatingOutfits.contains(id) {
+            ProgressView("正在准备整套图…").font(.footnote)
+        } else if let issue = actions.outfitImageIssues[id] {
+            Text(issue).font(.footnote).foregroundStyle(Color.secondaryLabel)
+        }
+        if actions.generatedImages[id] == nil, !actions.generatingOutfits.contains(id) {
+            Button(actions.outfitImageIssues[id] == nil ? "看一下整套效果" : "重新生成整套图", systemImage: "sparkles") {
                 Task { await actions.generateImage(for: outfit) }
             }
             .buttonStyle(.glass)
@@ -886,3 +953,4 @@ private struct AskEntryView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 }
+
