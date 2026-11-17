@@ -107,6 +107,8 @@ private struct FavoriteOutfitDetailView: View {
     @Environment(AppModel.self) private var app
     @State private var shareDraft: OutfitShareDraft?
     @State private var favoriteReadID: UUID?
+    @State private var showsPieces = false
+    @State private var showsGarmentDetails = false
 
     private var isFavorite: Bool { model.actions.favoriteOutfitIDs.contains(outfit.outfitId) }
     private var pieces: [BoardItem] { model.actions.boardItems(for: outfit, useOriginalPhotoFallback: true) }
@@ -120,39 +122,74 @@ private struct FavoriteOutfitDetailView: View {
                     Text(outfit.title)
                         .font(.display(30, weight: .black, relativeTo: .largeTitle))
                         .foregroundStyle(Color.label)
-                    Text(outfit.reason).foregroundStyle(Color.secondaryLabel)
                 }
-                OutfitBoard(items: pieces)
-                VStack(alignment: .leading, spacing: 0) {
-                    SectionHeading(title: "这一套")
-                    ForEach(pieces) { piece in
-                        if app.wardrobe.item(piece.itemID) != nil {
-                            NavigationLink {
-                                ItemDetailView(itemID: piece.itemID)
-                            } label: {
-                                pieceRow(piece)
-                            }
-                            .buttonStyle(.plain)
-                        } else {
-                            pieceRow(piece)
+                VStack(alignment: .leading, spacing: Spacing.control) {
+                    if !showsPieces, let image = actions.generatedImages[outfit.outfitId] {
+                        GarmentImage(url: image, forceOriginal: true, fit: true, photoAspectRatio: 2.0 / 3.0)
+                            .accessibilityLabel("这套收藏的整套搭配图")
+                    } else {
+                        OutfitBoard(items: pieces)
+                    }
+                    if actions.generatedImages[outfit.outfitId] != nil {
+                        Picker("搭配图片", selection: $showsPieces) {
+                            Text("整套图").tag(false)
+                            Text("看单品").tag(true)
                         }
-                        Divider().overlay(Color.separator)
+                        .pickerStyle(.segmented)
                     }
                 }
-                Button("从这套继续聊", systemImage: "text.bubble") {
-                    var saved = outfit
-                    saved.isFavorited = isFavorite
-                    app.discussOutfit(saved)
+                Text(outfit.reason)
+                    .font(.body)
+                    .foregroundStyle(Color.secondaryLabel)
+                DisclosureGroup("这套的 \(pieces.count) 件衣服", isExpanded: $showsGarmentDetails) {
+                    VStack(alignment: .leading, spacing: 0) {
+                        ForEach(pieces) { piece in
+                            if app.wardrobe.item(piece.itemID) != nil {
+                                NavigationLink {
+                                    ItemDetailView(itemID: piece.itemID)
+                                } label: {
+                                    pieceRow(piece)
+                                }
+                                .buttonStyle(.plain)
+                            } else {
+                                pieceRow(piece)
+                            }
+                            Divider().overlay(Color.separator)
+                        }
+                    }
                 }
-                .buttonStyle(.glassProminent)
-                .controlSize(.large)
-                .disabled(favoriteReadID != nil || actions.changingFavorites.contains(outfit.outfitId))
-                .accessibilityHint("带上收藏的这套衣服，在问问里继续修改")
+                .tint(Color.secondaryLabel)
+                .accessibilityIdentifier("favorites.pieces")
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(Spacing.screen)
         }
         .background(Color.background)
+        .safeAreaBar(edge: .bottom) {
+            VStack(spacing: Spacing.tight) {
+                Button {
+                    var saved = outfit
+                    saved.isFavorited = isFavorite
+                    app.discussOutfit(saved)
+                } label: {
+                    Label("从这套继续聊", systemImage: "text.bubble")
+                        .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.glassProminent)
+                .controlSize(.large)
+                .disabled(favoriteReadID != nil || actions.changingFavorites.contains(outfit.outfitId))
+                .accessibilityIdentifier("favorites.continueDesign")
+                .accessibilityHint("带上这套衣服，在问问里继续修改")
+                if isFavorite {
+                    Text("新的调整会保留这套收藏。")
+                        .font(.footnote)
+                        .foregroundStyle(Color.secondaryLabel)
+                }
+            }
+            .padding(.horizontal, Spacing.screen)
+            .padding(.bottom, Spacing.tight)
+        }
+        .scrollEdgeEffectStyle(.hard, for: .bottom)
         .navigationTitle("收藏穿搭")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -171,6 +208,7 @@ private struct FavoriteOutfitDetailView: View {
             OutfitShareSheet(draft: draft)
         }
         .task(id: app.favoritesChange) { await refreshFavorite() }
+        .task(id: outfit.outfitId) { await actions.loadGeneratedImage(for: outfit.outfitId) }
     }
 
     private func refreshFavorite() async {
@@ -296,3 +334,4 @@ private final class FavoriteOutfitsModel {
             accountGeneration == AccountLocalData.generation && !Task.isCancelled
     }
 }
+
