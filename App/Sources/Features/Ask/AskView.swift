@@ -129,13 +129,6 @@ struct AskView<Tools: View>: View {
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
         }
-        .onChange(of: model.isAsking) { wasAsking, asking in
-            if wasAsking, !asking, !isTyping,
-               model.entries.last?.styling != nil || model.entries.last?.needsOutfitUpdate == true {
-                showsCurrentOutfit = true
-                scrollPosition.scrollTo(id: AskScrollTarget.currentOutfit, anchor: .top)
-            }
-        }
         .onChange(of: isTyping) { _, typing in
             if typing { showsCurrentOutfit = false }
         }
@@ -489,7 +482,7 @@ private struct StylingCard: View {
                     ) { showsWearFeedback = true }
                     .accessibilityIdentifier("ask.wearFeedback")
                     if actions.generatedImages[outfit.outfitId] != nil {
-                        Button("更新整套图", systemImage: "arrow.clockwise") {
+                        Button("获取最新整套图", systemImage: "arrow.clockwise") {
                             Task { await actions.generateImage(for: outfit) }
                         }
                         .disabled(actions.generatingOutfits.contains(outfit.outfitId))
