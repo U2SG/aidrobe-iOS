@@ -130,7 +130,7 @@ final class ShouldIBuyModel {
     /// A conflict does not silently change the meaning of a request. Fetch the
     /// latest brief, show it, then let the user start a new evaluation explicitly.
     func reloadDesign() async {
-        guard isCurrent, !isBusy, let source else { return }
+        guard isCurrent, !isBusy, !isSavingChoice, let source else { return }
         let expectedEpoch = epoch
         phase = .working("正在读取这次的新条件…")
         await run(expectedEpoch) {
@@ -149,10 +149,32 @@ final class ShouldIBuyModel {
     }
 
     func evaluateLatest() async {
-        guard isCurrent, !isBusy, case .reviewingLatest = phase else { return }
+        guard isCurrent, !isBusy, !isSavingChoice, candidateID != nil,
+              case .reviewingLatest = phase else { return }
         requestID = UUID().uuidString
+        requestConcern = concern
         needsLatestDesign = false
         await evaluate()
+    }
+
+    /// Reuse the exact candidate while leaving its previous assessment intact.
+    func reassessCurrentDecision() async {
+        guard isCurrent, !isBusy, !isSavingChoice, case let .decided(decision) = phase,
+              let context = decision.designContext else { return }
+        epoch = UUID()
+        candidateID = decision.candidateId
+        replayDecisionID = nil
+        requestID = nil
+        source = ShoppingDesignSource(
+            conversationID: context.conversationId, revision: context.revision, constraints: context.constraints
+        )
+        // Historical responses do not expose the original concern; ask again.
+        concern = .none
+        requestConcern = .none
+        needsLatestDesign = true
+        choiceFailure = nil
+        choiceToRetry = nil
+        await reloadDesign()
     }
 
     func replay(_ asked: AskedPurchase) async { await replay(decisionID: asked.decisionID) }

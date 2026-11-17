@@ -105,8 +105,8 @@ final class WalkthroughTests: XCTestCase {
         resume.tap()
         settle(2)
         let purchase = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'ask.purchaseDecision.'")).firstMatch
-        guard purchase.waitForExistence(timeout: 20), reveal(purchase, towardTop: true) else {
-            return XCTFail("Purchase result is missing from the original conversation")
+        guard purchase.waitForExistence(timeout: 20), waitUntilHittable(purchase) else {
+            return XCTFail("Returning did not reveal the purchase result in the original conversation")
         }
         let purchaseIdentifier = purchase.identifier
         XCTAssert(purchase.label.contains("再想想"))
@@ -136,6 +136,35 @@ final class WalkthroughTests: XCTestCase {
         guard reveal(saved) else { return XCTFail("Saved choice is missing from historical decision") }
         XCTAssert(saved.label.contains("这次不买"))
         shot("75-shopping-replayed")
+
+        let reassess = app.buttons["shopping.reassess"]
+        guard reveal(reassess) else { return XCTFail("The saved candidate cannot be reassessed") }
+        reassess.tap()
+        let evaluate = app.buttons["shopping.evaluateLatest"]
+        guard evaluate.waitForExistence(timeout: 30), reveal(evaluate) else {
+            return XCTFail("Latest design conditions were not presented for confirmation")
+        }
+        XCTAssertFalse(app.buttons["shopping.pickPhoto"].exists)
+        shot("76-shopping-review-new-conditions")
+        evaluate.tap()
+        guard result.waitForExistence(timeout: 90), reveal(resume) else {
+            return XCTFail("The saved candidate was not reassessed without another photo")
+        }
+        resume.tap()
+        let assessments = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH 'ask.purchaseDecision.'"))
+        let appended = XCTNSPredicateExpectation(predicate: NSPredicate(format: "count == 2"), object: assessments)
+        guard XCTWaiter.wait(for: [appended], timeout: 20) == .completed else {
+            return XCTFail("Reassessment replaced the original purchase record")
+        }
+        let latest = assessments.allElementsBoundByIndex.first { $0.identifier != purchaseIdentifier }
+        guard let latest, waitUntilHittable(latest) else { return XCTFail("The new assessment was not revealed") }
+        shot("77-shopping-both-assessments")
+        guard reveal(restored, towardTop: true) else { return XCTFail("Original assessment disappeared") }
+        restored.tap()
+        guard result.waitForExistence(timeout: 30) else { return XCTFail("Original assessment is no longer readable") }
+        XCTAssertEqual(result.label, frozenText)
+        guard reveal(saved) else { return XCTFail("Original purchase choice disappeared") }
+        XCTAssert(saved.label.contains("这次不买"))
     }
 
     private func sendDesignMessage(_ text: String) {
@@ -151,6 +180,11 @@ final class WalkthroughTests: XCTestCase {
     private func waitUntilEnabled(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
         let ready = XCTNSPredicateExpectation(predicate: NSPredicate(format: "enabled == true"), object: element)
         return XCTWaiter.wait(for: [ready], timeout: timeout) == .completed
+    }
+
+    private func waitUntilHittable(_ element: XCUIElement, timeout: TimeInterval = 15) -> Bool {
+        let visible = XCTNSPredicateExpectation(predicate: NSPredicate(format: "hittable == true"), object: element)
+        return XCTWaiter.wait(for: [visible], timeout: timeout) == .completed
     }
 
     private func reveal(_ element: XCUIElement, towardTop: Bool = false) -> Bool {

@@ -10,6 +10,7 @@ struct AskView<Tools: View>: View {
     @State private var draft = ""
     @State private var tripSource: PackingDesignSource?
     @State private var shopping: AskShoppingPresentation?
+    @State private var purchaseToReveal: (conversationID: String, decisionID: String)?
     @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
     @FocusState private var isTyping: Bool
     private let tools: Tools
@@ -54,6 +55,12 @@ struct AskView<Tools: View>: View {
             }
         }
         .sheet(item: $shopping, onDismiss: {
+            let target = purchaseToReveal
+            purchaseToReveal = nil
+            if let target, model?.conversationID == target.conversationID,
+               model?.purchaseDecisions.contains(where: { $0.id == target.decisionID }) == true {
+                scrollPosition.scrollTo(id: AskScrollTarget.purchase(target.decisionID), anchor: .center)
+            }
             Task { await model?.refreshSavedDesign() }
         }) { presentation in
             NavigationStack {
@@ -207,8 +214,16 @@ struct AskView<Tools: View>: View {
     }
 
     private func openShopping(_ model: AskModel, decisionID: String? = nil) {
+        purchaseToReveal = nil
+        let receive = model.purchaseReceiver()
         shopping = AskShoppingPresentation(
-            source: model.shoppingSource, decisionID: decisionID, onDecision: model.purchaseReceiver()
+            source: model.shoppingSource, decisionID: decisionID, onDecision: { decision in
+                receive(decision)
+                guard let conversationID = decision.designContext?.conversationId,
+                      model.conversationID == conversationID,
+                      model.purchaseDecisions.contains(where: { $0.id == decision.id }) else { return }
+                purchaseToReveal = (conversationID, decision.id)
+            }
         )
     }
 

@@ -182,6 +182,42 @@ private actor LostShoppingResponse {
         })
     }
 
+    @Test func savedCandidateCanBeReassessedWithoutReplacingItsOriginalAssessment() async throws {
+        let nextDecisionID = "30000000-0000-0000-0000-000000000003"
+        let (client, transport) = shoppingClient { request in
+            if request.url?.path() == "/v1/wardrobe-decisions/\(ShoppingFixture.decision)" {
+                return (200, ShoppingFixture.result(revision: 3, choice: "skip"))
+            }
+            if request.url?.path() == "/v1/ask/conversations/\(ShoppingFixture.conversation)" {
+                return (200, ShoppingFixture.conversationBody)
+            }
+            #expect(request.url?.path() == "/v1/purchase-candidates/\(ShoppingFixture.candidate)/decision")
+            let body = try shoppingBody(request)
+            #expect(body["request_id"] as? String == ShoppingFixture.nextRequest)
+            #expect(body["expected_revision"] as? Int == 5)
+            #expect(body["concern"] as? String == "volume")
+            return (200, ShoppingFixture.result(revision: 5, id: nextDecisionID))
+        }
+        let original = try await client.send(Endpoints.wardrobeDecision(ShoppingFixture.decision))
+        let originalContext = try #require(original.designContext)
+        let conversation = try await client.send(Endpoints.askConversation(originalContext.conversationId))
+        let latest = try #require(conversation.designBrief)
+        let reassessed = try await client.send(Endpoints.decide(
+            candidateID: original.candidateId, concern: .volume,
+            conversationID: originalContext.conversationId, expectedRevision: latest.revision,
+            requestID: ShoppingFixture.nextRequest
+        ))
+        let replayed = try await client.send(Endpoints.wardrobeDecision(original.id))
+        #expect(reassessed.candidateId == original.candidateId)
+        #expect(reassessed.id != original.id)
+        #expect(reassessed.designContext?.revision == 5)
+        #expect(reassessed.choice == nil)
+        #expect(replayed.designContext?.revision == 3)
+        #expect(replayed.choice?.rawValue == "skip")
+        #expect(replayed.decisionText == original.decisionText)
+        #expect(transport.requests.map(\.httpMethod) == ["GET", "GET", "POST", "GET"])
+    }
+
     @Test func conversationRestoresHistoricalPurchaseContextsWithoutReplacingPendingBrief() async throws {
         let (client, _) = shoppingClient { _ in (200, ShoppingFixture.conversationBody) }
         let conversation = try await client.send(Endpoints.askConversation(ShoppingFixture.conversation))

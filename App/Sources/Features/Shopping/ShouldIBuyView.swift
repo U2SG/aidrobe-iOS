@@ -94,8 +94,7 @@ struct ShouldIBuyView: View {
     // MARK: Landing
 
     private func landing(_ model: ShouldIBuyModel) -> some View {
-        @Bindable var model = model
-        return ScrollView {
+        ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
                 VStack(alignment: .leading, spacing: Spacing.control) {
                     Text("购买参考").kicker()
@@ -111,16 +110,7 @@ struct ShouldIBuyView: View {
                 if let source = model.source {
                     ShoppingDesignSummary(constraints: source.constraints, title: "带着这些条件看")
                 }
-                VStack(alignment: .leading, spacing: Spacing.control) {
-                    SectionHeading(title: "最拿不准的是")
-                    FlowLayout {
-                        ForEach(ShoppingCopy.concerns, id: \.value) { option in
-                            Chip(title: option.title, isSelected: model.concern == option.value) {
-                                model.concern = model.concern == option.value ? .none : option.value
-                            }
-                        }
-                    }
-                }
+                concerns(model)
                 PhotosPicker(selection: $picked, matching: .images) {
                     Text("选一张图").fontWeight(.semibold).frame(maxWidth: .infinity)
                 }
@@ -175,6 +165,19 @@ struct ShouldIBuyView: View {
 
     // MARK: States
 
+    private func concerns(_ model: ShouldIBuyModel) -> some View {
+        VStack(alignment: .leading, spacing: Spacing.control) {
+            SectionHeading(title: "最拿不准的是")
+            FlowLayout {
+                ForEach(ShoppingCopy.concerns, id: \.value) { option in
+                    Chip(title: option.title, isSelected: model.concern == option.value) {
+                        model.concern = model.concern == option.value ? .none : option.value
+                    }
+                }
+            }
+        }
+    }
+
     private func failed(_ message: String, model: ShouldIBuyModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
@@ -200,12 +203,13 @@ struct ShouldIBuyView: View {
     private func reviewLatest(_ model: ShouldIBuyModel) -> some View {
         ScrollView {
             VStack(alignment: .leading, spacing: Spacing.section) {
-                Text("这次的条件更新了").font(.display(28, weight: .black, relativeTo: .title))
-                retainedCandidate(model)
+                Text("按现在的想法再看看").font(.display(28, weight: .black, relativeTo: .title))
+                retainedCandidate(model, showsConcern: false)
                 if let source = model.source {
                     ShoppingDesignSummary(constraints: source.constraints, title: "现在想要的是")
                 }
-                Text("还是刚才那件衣服。确认后，会按这些条件重新判断。")
+                concerns(model)
+                Text("还是刚才那件衣服。确认后，会按这些条件重新判断，之前的判断也会保留。")
                     .foregroundStyle(Color.secondaryLabel)
                 Button("按这些条件重新看") { Task { await model.evaluateLatest() } }
                     .buttonStyle(.glassProminent)
@@ -217,14 +221,14 @@ struct ShouldIBuyView: View {
         }
     }
 
-    @ViewBuilder private func retainedCandidate(_ model: ShouldIBuyModel) -> some View {
+    @ViewBuilder private func retainedCandidate(_ model: ShouldIBuyModel, showsConcern: Bool = true) -> some View {
         if let photo = model.photo {
             Image(uiImage: photo)
                 .resizable().scaledToFit().frame(maxHeight: 220)
                 .clipShape(.rect(cornerRadius: Radius.card))
                 .accessibilityLabel("已保留的候选衣服")
         }
-        if let concern = ShoppingCopy.concerns.first(where: { $0.value == model.evaluationConcern }) {
+        if showsConcern, let concern = ShoppingCopy.concerns.first(where: { $0.value == model.evaluationConcern }) {
             Text("你最拿不准的是：\(concern.title)")
                 .font(.subheadline).foregroundStyle(Color.secondaryLabel)
         }
@@ -299,6 +303,13 @@ private struct DecisionPage: View {
                         .accessibilityIdentifier("shopping.continue")
                     Text("这次的判断已记在原来的对话里，继续聊时不用再说一遍。")
                         .font(.footnote).foregroundStyle(Color.tertiaryLabel)
+                    Button("按现在的想法，再看这件", systemImage: "arrow.clockwise") {
+                        Task { await model.reassessCurrentDecision() }
+                    }
+                    .buttonStyle(.glass)
+                    .controlSize(.large)
+                    .disabled(model.isSavingChoice)
+                    .accessibilityIdentifier("shopping.reassess")
                 }
                 Button(model.source == nil ? "再问一件" : "按当前条件再问一件") { model.startOver() }
                     .buttonStyle(.glass)
