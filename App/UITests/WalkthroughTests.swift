@@ -237,28 +237,44 @@ final class WalkthroughTests: XCTestCase {
         if !stay { back() }
     }
 
-    /// Reopens a saved seven-question conversation of the dev user (from
-    /// 2026-11-16) through the last-conversation bookmark.
-    func testAskProgressRail() {
+    /// Opens a saved conversation with several questions through the
+    /// last-conversation bookmark. Set `TEST_RUNNER_ASK_RAIL_CONVERSATION` to
+    /// such a conversation of the dev user; without it the test is skipped.
+    func testAskProgressRail() throws {
+        guard let conversation = ProcessInfo.processInfo.environment["ASK_RAIL_CONVERSATION"] else {
+            throw XCTSkip("Set TEST_RUNNER_ASK_RAIL_CONVERSATION to a dev-user conversation with several questions")
+        }
         let bookmark = "-aidrobe.ask.last-conversation.http://localhost:8000|00000000-0000-4000-8000-000000000001"
-        launch(onboarded: true, extra: [
-            "-aidrobe.display.appearance", "light", bookmark, "87b8618d-e3bf-42d9-91d9-2fbb2b2d1ef6",
-        ])
+        launch(onboarded: true, extra: ["-aidrobe.display.appearance", "light", bookmark, conversation])
         guard app.tabBars.buttons["问问"].waitForExistence(timeout: 60) else { return XCTFail("Ask tab unavailable") }
         app.tabBars.buttons["问问"].tap()
         let rail = app.descendants(matching: .any)["ask.progressRail"]
         guard rail.waitForExistence(timeout: 30) else { return XCTFail("Progress rail missing") }
         settle(2)
         shot("44-ask-rail")
-        XCTAssert(app.buttons["新对话"].firstMatch.isHittable, "New conversation should stay pinned on screen")
-        // Drag to the first tick: the page jumps back to the first question.
-        let first = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
-        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).press(forDuration: 0.2, thenDragTo: first)
+        let newConversation = app.buttons["新对话"].firstMatch
+        XCTAssert(newConversation.isHittable, "New conversation should stay pinned on screen")
+        let atEnd = rail.value as? String
+
+        // A quick swipe that starts on the rail scrolls the page instead of scrubbing.
+        let middle = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: 140)))
+        settle(2)
+        XCTAssertNotEqual(rail.value as? String, atEnd, "Swiping on the rail should scroll the page")
+
+        // Tapping the first tick jumps to the first question.
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10)).tap()
         settle(2)
         shot("44a-ask-rail-first")
-        let question = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'I just uploaded one photo'")).firstMatch
-        XCTAssert(question.isHittable, "Dragging to the first tick should show the first question")
-        XCTAssert(app.buttons["新对话"].firstMatch.isHittable)
+        XCTAssert((rail.value as? String)?.hasPrefix("第1问") == true, "Tapping the first tick should show the first question")
+
+        // Holding, then dragging to the last tick jumps to the last question.
+        let last = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -10))
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10))
+            .press(forDuration: 0.4, thenDragTo: last)
+        settle(2)
+        XCTAssertEqual(rail.value as? String, atEnd, "Dragging to the last tick should show the last question")
+        XCTAssert(newConversation.isHittable)
     }
 
     func testMainLine() {
