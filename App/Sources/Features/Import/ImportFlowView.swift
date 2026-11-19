@@ -276,6 +276,11 @@ private struct ConfirmImportView: View {
                         Text(draft.imageCaption)
                             .font(.caption)
                             .foregroundStyle(Color.secondaryLabel)
+                        if draft.partiallyHidden {
+                            Label("被外套挡住了大半，不会生成单品图。想要完整的单品图，可以单独拍一张。", systemImage: "eye.slash")
+                                .font(.footnote)
+                                .foregroundStyle(Color.secondaryLabel)
+                        }
                     } else {
                         ForEach(draft.possibleDuplicates, id: \.itemId) { match in
                             VStack(alignment: .leading, spacing: Spacing.tight) {

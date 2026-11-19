@@ -42,6 +42,8 @@ final class ImportFlowModel {
         let imageCaption: String
         let alreadyConfirmed: Bool
         let possibleDuplicates: [Wire.ImportDuplicateHint]
+        /// Mostly covered by an outer layer in the photo; the backend makes no product image for it.
+        var partiallyHidden = false
     }
 
     private(set) var jobs: [Job] = []
@@ -199,7 +201,8 @@ final class ImportFlowModel {
                 imageCaption: candidate.cutoutImageUrl != nil ? "AI 单品图"
                     : candidate.cropImageUrl != nil ? "原照裁剪" : "原照 · 暂无单品图",
                 alreadyConfirmed: candidate.confirmedItemId != nil,
-                possibleDuplicates: candidate.possibleDuplicates ?? []
+                possibleDuplicates: candidate.possibleDuplicates ?? [],
+                partiallyHidden: candidate.visibility == "partially_hidden"
             )
         }
     }
