@@ -292,7 +292,7 @@ private struct TodayPage: View {
                     .disabled(model.generatingOutfits.contains(id))
                 } label: {
                     Image(systemName: "ellipsis")
-                        .frame(width: 44, height: 44)
+                        .frame(width: 18, height: 18)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
