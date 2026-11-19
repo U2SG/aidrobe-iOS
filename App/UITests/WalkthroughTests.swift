@@ -36,13 +36,19 @@ final class WalkthroughTests: XCTestCase {
         XCTAssert(app.tabBars.buttons["问问"].waitForExistence(timeout: 60))
         app.tabBars.buttons["问问"].tap()
         settle(3)
+        // Ask reopens the latest conversation; start fresh so the starter prompts show.
+        let fresh = app.buttons["新对话"].firstMatch
+        if fresh.exists, scrollIntoOpenArea(fresh) {
+            fresh.tap()
+            settle(2)
+        }
         shot("40-ask")
         app.buttons["周五面试穿什么"].tap()
         // With an answer model the page shows the answer and its garments; without one, a quiet note.
         let answered = app.buttons["有帮助"].waitForExistence(timeout: 45)
         settle(2)
         shot(answered ? "40a-ask-answer" : "40a-ask-unavailable")
-        app.buttons["新对话"].tap()
+        app.buttons["新对话"].firstMatch.tap()
         settle(3)
         shot("40c-ask-new")
         push("该不该买", shot: "41-should-i-buy")
@@ -59,6 +65,7 @@ final class WalkthroughTests: XCTestCase {
         app.tabBars.buttons["我的"].tap()
         settle(2)
         push("全部记录", shot: "45-journal")
+        push("收藏穿搭", shot: "45b-favorites")
         app.swipeUp()
         shot("44-profile-links")
         push("衣橱洞察", shot: "46-insights", scrollShot: "46b-insights-more")
@@ -195,6 +202,19 @@ final class WalkthroughTests: XCTestCase {
         return element.exists && element.isHittable
     }
 
+    private func scrollIntoOpenArea(_ element: XCUIElement) -> Bool {
+        let bar = app.navigationBars.firstMatch
+        let tabs = app.tabBars.firstMatch
+        for _ in 0..<6 {
+            let top = bar.exists ? bar.frame.maxY : app.frame.minY
+            let bottom = tabs.exists ? tabs.frame.minY : app.frame.maxY
+            if element.frame.minY >= top, element.frame.maxY <= bottom { return element.isHittable }
+            if element.frame.minY < top { app.swipeDown() } else { app.swipeUp() }
+            settle(1)
+        }
+        return false
+    }
+
     /// Opens a row, screenshots the page (and optionally one scroll down), and comes back.
     private func back() {
         app.navigationBars.buttons.element(boundBy: 0).tap()
@@ -204,6 +224,8 @@ final class WalkthroughTests: XCTestCase {
     private func push(_ label: String, shot name: String, scrollShot: String? = nil, stay: Bool = false) {
         let row = app.buttons.matching(NSPredicate(format: "label CONTAINS %@", label)).firstMatch
         guard row.waitForExistence(timeout: 5) else { return XCTFail("no row \(label)") }
+        // A row scrolled under the navigation or tab bar still counts as hittable, but a tap lands on the bar.
+        guard scrollIntoOpenArea(row) else { return XCTFail("row \(label) is not reachable") }
         row.tap()
         settle(4)
         shot(name)
