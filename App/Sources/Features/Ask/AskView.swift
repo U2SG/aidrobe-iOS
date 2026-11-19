@@ -685,7 +685,7 @@ private struct StylingCard: View {
                         .disabled(actions.wornOutfitIDs.contains(outfit.outfitId))
                     }
                 } label: {
-                    Image(systemName: "ellipsis").frame(width: 44, height: 44)
+                    Image(systemName: "ellipsis").frame(width: 18, height: 18)
                 }
                 .buttonStyle(.glass)
                 .buttonBorderShape(.circle)
