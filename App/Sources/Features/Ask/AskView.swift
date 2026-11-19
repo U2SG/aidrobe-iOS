@@ -13,6 +13,7 @@ struct AskView<Tools: View>: View {
     @State private var purchaseToReveal: (conversationID: String, decisionID: String)?
     @State private var showsCurrentOutfit = true
     @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
+    @State private var turnInView: UUID?
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -170,6 +171,13 @@ struct AskView<Tools: View>: View {
             .padding(.bottom, Spacing.section)
         }
         .scrollPosition($scrollPosition)
+        .onScrollTargetVisibilityChange(idType: AskScrollTarget.self, threshold: 0.2) { visible in
+            let ids = Set(visible)
+            turnInView = model.entries.first { ids.contains(.turn($0.id)) }?.id ?? turnInView
+        }
+        .safeAreaBar(edge: .top) { newConversationButton(model) }
+        .overlay(alignment: .trailing) { progressRail(model) }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollDismissesKeyboard(.interactively)
         .onChange(of: model.entries.last?.id, initial: true) { _, id in
             if let id {
@@ -303,27 +311,51 @@ struct AskView<Tools: View>: View {
                           ? .display(24, relativeTo: .title2)
                           : .display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
-                Spacer()
-                if model.hasConversation || model.restorationFailure != nil {
-                    Button {
-                        draft = ""
-                        isTyping = false
-                        Task { await model.startOver() }
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                    .disabled(model.isBusy)
-                    .accessibilityLabel("新对话")
-                }
+                Spacer(minLength: 0)
             }
             if !model.hasConversation {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
+        }
+    }
+
+    private func showsNewConversation(_ model: AskModel) -> Bool {
+        model.hasConversation || model.restorationFailure != nil
+    }
+
+    /// Pinned above the page so a new conversation never needs a scroll back up;
+    /// as a safe-area bar it also keeps scroll targets from landing under it.
+    @ViewBuilder private func newConversationButton(_ model: AskModel) -> some View {
+        if showsNewConversation(model) {
+            Button {
+                draft = ""
+                isTyping = false
+                Task { await model.startOver() }
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .disabled(model.isBusy)
+            .accessibilityLabel("新对话")
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, Spacing.screen)
+            .padding(.bottom, Spacing.tight)
+        }
+    }
+
+    @ViewBuilder private func progressRail(_ model: AskModel) -> some View {
+        let marks = model.entries.map { AskProgressRail.Mark(id: $0.id, question: $0.question) }
+        if marks.count > 1 {
+            let current = marks.contains { $0.id == turnInView } ? turnInView : marks.last?.id
+            AskProgressRail(marks: marks, current: current) { id in
+                isTyping = false
+                scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
+            }
+            .padding(.trailing, 2)
         }
     }
 

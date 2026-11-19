@@ -237,6 +237,30 @@ final class WalkthroughTests: XCTestCase {
         if !stay { back() }
     }
 
+    /// Reopens a saved seven-question conversation of the dev user (from
+    /// 2026-11-16) through the last-conversation bookmark.
+    func testAskProgressRail() {
+        let bookmark = "-aidrobe.ask.last-conversation.http://localhost:8000|00000000-0000-4000-8000-000000000001"
+        launch(onboarded: true, extra: [
+            "-aidrobe.display.appearance", "light", bookmark, "87b8618d-e3bf-42d9-91d9-2fbb2b2d1ef6",
+        ])
+        guard app.tabBars.buttons["问问"].waitForExistence(timeout: 60) else { return XCTFail("Ask tab unavailable") }
+        app.tabBars.buttons["问问"].tap()
+        let rail = app.descendants(matching: .any)["ask.progressRail"]
+        guard rail.waitForExistence(timeout: 30) else { return XCTFail("Progress rail missing") }
+        settle(2)
+        shot("44-ask-rail")
+        XCTAssert(app.buttons["新对话"].firstMatch.isHittable, "New conversation should stay pinned on screen")
+        // Drag to the first tick: the page jumps back to the first question.
+        let first = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.05))
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.95)).press(forDuration: 0.2, thenDragTo: first)
+        settle(2)
+        shot("44a-ask-rail-first")
+        let question = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'I just uploaded one photo'")).firstMatch
+        XCTAssert(question.isHittable, "Dragging to the first tick should show the first question")
+        XCTAssert(app.buttons["新对话"].firstMatch.isHittable)
+    }
+
     func testMainLine() {
         launch(onboarded: true)
         XCTAssert(app.buttons["today.markWorn"].waitForExistence(timeout: 60) || app.buttons["说说穿着感受"].exists)
