@@ -5,3 +5,6 @@ xcuserdata/
 .DS_Store
 .swiftpm/
 Packages/AidrobeKit/.build/
+
+# Per-developer Debug overrides, read by Config/Debug.xcconfig
+/Config/Debug.local.xcconfig
