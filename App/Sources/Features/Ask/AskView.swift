@@ -13,6 +13,13 @@ struct AskView<Tools: View>: View {
     @State private var purchaseToReveal: (conversationID: String, decisionID: String)?
     @State private var showsCurrentOutfit = true
     @State private var scrollPosition = ScrollPosition(idType: AskScrollTarget.self)
+    /// Turns whose question has scrolled up to the pinned bar.
+    @State private var passedTurns: Set<UUID> = []
+    @State private var isAtBottom = false
+    /// The question last picked on the rail. It stays current until the page is
+    /// dragged by hand, because a jump near the end cannot always bring it to the top.
+    @State private var pickedTurn: UUID?
+    @State private var topInset: CGFloat = 0
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -143,6 +150,11 @@ struct AskView<Tools: View>: View {
                     case let .turn(entry):
                         AskEntryView(entry: entry, model: model)
                             .id(item.id)
+                            .onGeometryChange(for: Bool.self) {
+                                $0.frame(in: .scrollView).minY < topInset + 24
+                            } action: { passed in
+                                if passed { passedTurns.insert(entry.id) } else { passedTurns.remove(entry.id) }
+                            }
                     case let .packingList(list):
                         savedPackingList(list)
                             .id(item.id)
@@ -170,8 +182,26 @@ struct AskView<Tools: View>: View {
             .padding(.bottom, Spacing.section)
         }
         .scrollPosition($scrollPosition)
+        .onScrollGeometryChange(for: Bool.self) { geometry in
+            // `containerSize` excludes the insets; the top one is part of the offset origin.
+            geometry.contentOffset.y + geometry.contentInsets.top + geometry.containerSize.height
+                >= geometry.contentSize.height - 1
+        } action: { _, atBottom in
+            isAtBottom = atBottom
+        }
+        // A question becomes current once its top is within 24 pt of the pinned bar.
+        .onScrollGeometryChange(for: CGFloat.self) { $0.contentInsets.top } action: { _, inset in
+            topInset = inset
+        }
+        .safeAreaBar(edge: .top) { newConversationButton(model) }
+        .overlay(alignment: .trailing) { progressRail(model) }
+        .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollDismissesKeyboard(.interactively)
+        .onScrollPhaseChange { _, phase in
+            if phase == .interacting { pickedTurn = nil }
+        }
         .onChange(of: model.entries.last?.id, initial: true) { _, id in
+            pickedTurn = nil
             if let id {
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
@@ -303,27 +333,56 @@ struct AskView<Tools: View>: View {
                           ? .display(24, relativeTo: .title2)
                           : .display(34, weight: .black, relativeTo: .largeTitle))
                     .foregroundStyle(Color.label)
-                Spacer()
-                if model.hasConversation || model.restorationFailure != nil {
-                    Button {
-                        draft = ""
-                        isTyping = false
-                        Task { await model.startOver() }
-                    } label: {
-                        Image(systemName: "square.and.pencil")
-                            .frame(width: 28, height: 28)
-                    }
-                    .buttonStyle(.glass)
-                    .buttonBorderShape(.circle)
-                    .disabled(model.isBusy)
-                    .accessibilityLabel("新对话")
-                }
+                Spacer(minLength: 0)
             }
             if !model.hasConversation {
                 Text("只用你衣橱里真有的衣服来回答。")
                     .font(.subheadline)
                     .foregroundStyle(Color.secondaryLabel)
             }
+        }
+    }
+
+    private func showsNewConversation(_ model: AskModel) -> Bool {
+        model.hasConversation || model.restorationFailure != nil
+    }
+
+    /// Pinned above the page so a new conversation never needs a scroll back up;
+    /// as a safe-area bar it also keeps scroll targets from landing under it.
+    @ViewBuilder private func newConversationButton(_ model: AskModel) -> some View {
+        if showsNewConversation(model) {
+            Button {
+                draft = ""
+                isTyping = false
+                Task { await model.startOver() }
+            } label: {
+                Image(systemName: "square.and.pencil")
+                    .frame(width: 28, height: 28)
+            }
+            .buttonStyle(.glass)
+            .buttonBorderShape(.circle)
+            .disabled(model.isBusy)
+            .accessibilityLabel("新对话")
+            .frame(maxWidth: .infinity, alignment: .trailing)
+            .padding(.horizontal, Spacing.screen)
+            .padding(.bottom, Spacing.tight)
+        }
+    }
+
+    @ViewBuilder private func progressRail(_ model: AskModel) -> some View {
+        let marks = model.entries.map { AskProgressRail.Mark(id: $0.id, question: $0.question) }
+        if marks.count > 1 {
+            // The question nearest the top: the last one past the line, or
+            // the last question once the page cannot scroll any further.
+            let current = if let pickedTurn, marks.contains(where: { $0.id == pickedTurn }) { pickedTurn }
+                else if isAtBottom { marks.last?.id }
+                else { marks.last { passedTurns.contains($0.id) }?.id ?? marks.first?.id }
+            AskProgressRail(marks: marks, current: current) { id in
+                isTyping = false
+                pickedTurn = id
+                scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
+            }
+            .padding(.trailing, 2)
         }
     }
 

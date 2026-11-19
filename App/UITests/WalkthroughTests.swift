@@ -237,6 +237,45 @@ final class WalkthroughTests: XCTestCase {
         if !stay { back() }
     }
 
+    /// Opens a saved conversation with several questions through the
+    /// last-conversation bookmark. Set `TEST_RUNNER_ASK_RAIL_CONVERSATION` to
+    /// such a conversation of the dev user; without it the test is skipped.
+    func testAskProgressRail() throws {
+        guard let conversation = ProcessInfo.processInfo.environment["ASK_RAIL_CONVERSATION"] else {
+            throw XCTSkip("Set TEST_RUNNER_ASK_RAIL_CONVERSATION to a dev-user conversation with several questions")
+        }
+        let bookmark = "-aidrobe.ask.last-conversation.http://localhost:8000|00000000-0000-4000-8000-000000000001"
+        launch(onboarded: true, extra: ["-aidrobe.display.appearance", "light", bookmark, conversation])
+        guard app.tabBars.buttons["问问"].waitForExistence(timeout: 60) else { return XCTFail("Ask tab unavailable") }
+        app.tabBars.buttons["问问"].tap()
+        let rail = app.descendants(matching: .any)["ask.progressRail"]
+        guard rail.waitForExistence(timeout: 30) else { return XCTFail("Progress rail missing") }
+        settle(2)
+        shot("44-ask-rail")
+        let newConversation = app.buttons["新对话"].firstMatch
+        XCTAssert(newConversation.isHittable, "New conversation should stay pinned on screen")
+        let atEnd = rail.value as? String
+
+        // Near the end the page cannot scroll a question to the top; the picked one stays current.
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -20)).tap()
+        settle(2)
+        XCTAssert((rail.value as? String)?.hasPrefix("第6问") == true, "The picked question should stay current at the end")
+
+        // Tapping the first tick jumps to the first question.
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10)).tap()
+        settle(2)
+        shot("44a-ask-rail-first")
+        XCTAssert((rail.value as? String)?.hasPrefix("第1问") == true, "Tapping the first tick should show the first question")
+
+        // Dragging to the last tick jumps to the last question.
+        let last = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -10))
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10))
+            .press(forDuration: 0.05, thenDragTo: last)
+        settle(2)
+        XCTAssertEqual(rail.value as? String, atEnd, "Dragging to the last tick should show the last question")
+        XCTAssert(newConversation.isHittable)
+    }
+
     func testMainLine() {
         launch(onboarded: true)
         XCTAssert(app.buttons["today.markWorn"].waitForExistence(timeout: 60) || app.buttons["说说穿着感受"].exists)
