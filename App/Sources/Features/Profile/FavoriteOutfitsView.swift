@@ -14,9 +14,6 @@ struct FavoriteOutfitsView: View {
         .background(Color.background)
         .navigationTitle("收藏穿搭")
         .navigationBarTitleDisplayMode(.inline)
-        .navigationDestination(for: Wire.OutfitResponse.self) { outfit in
-            if let model { FavoriteOutfitDetailView(outfit: outfit, model: model) }
-        }
         .task(id: app.favoritesChange) {
             if model == nil {
                 model = FavoriteOutfitsModel(
@@ -62,7 +59,12 @@ struct FavoriteOutfitsView: View {
         @Bindable var model = model
         return List {
             ForEach(model.items, id: \.outfitId) { outfit in
-                NavigationLink(value: outfit) {
+                // Destination-based: a value destination declared in this pushed
+                // screen is registered twice on the Profile stack, and SwiftUI then
+                // ignores the row tap.
+                NavigationLink {
+                    FavoriteOutfitDetailView(outfit: outfit, model: model)
+                } label: {
                     let pieces = model.actions.boardItems(for: outfit, useOriginalPhotoFallback: true)
                     HStack(spacing: Spacing.row) {
                         OutfitBoard(items: pieces)
