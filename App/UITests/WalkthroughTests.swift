@@ -256,22 +256,16 @@ final class WalkthroughTests: XCTestCase {
         XCTAssert(newConversation.isHittable, "New conversation should stay pinned on screen")
         let atEnd = rail.value as? String
 
-        // A quick swipe that starts on the rail scrolls the page instead of scrubbing.
-        let middle = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
-        middle.press(forDuration: 0.05, thenDragTo: middle.withOffset(CGVector(dx: 0, dy: 140)))
-        settle(2)
-        XCTAssertNotEqual(rail.value as? String, atEnd, "Swiping on the rail should scroll the page")
-
         // Tapping the first tick jumps to the first question.
         rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10)).tap()
         settle(2)
         shot("44a-ask-rail-first")
         XCTAssert((rail.value as? String)?.hasPrefix("第1问") == true, "Tapping the first tick should show the first question")
 
-        // Holding, then dragging to the last tick jumps to the last question.
+        // Dragging to the last tick jumps to the last question.
         let last = rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -10))
         rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10))
-            .press(forDuration: 0.4, thenDragTo: last)
+            .press(forDuration: 0.05, thenDragTo: last)
         settle(2)
         XCTAssertEqual(rail.value as? String, atEnd, "Dragging to the last tick should show the last question")
         XCTAssert(newConversation.isHittable)

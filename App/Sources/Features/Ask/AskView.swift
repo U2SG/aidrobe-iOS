@@ -17,7 +17,6 @@ struct AskView<Tools: View>: View {
     @State private var passedTurns: Set<UUID> = []
     @State private var isAtBottom = false
     @State private var topInset: CGFloat = 0
-    @State private var railPan = RailPan()
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -180,13 +179,6 @@ struct AskView<Tools: View>: View {
             .padding(.bottom, Spacing.section)
         }
         .scrollPosition($scrollPosition)
-        .onScrollGeometryChange(for: ScrollBounds.self) { geometry in
-            let top = -geometry.contentInsets.top
-            let bottom = geometry.contentSize.height - geometry.containerSize.height - geometry.contentInsets.top
-            return ScrollBounds(offset: geometry.contentOffset.y, top: top, bottom: max(top, bottom))
-        } action: { _, bounds in
-            railPan.bounds = bounds
-        }
         .onScrollGeometryChange(for: Bool.self) { geometry in
             // `containerSize` excludes the insets; the top one is part of the offset origin.
             geometry.contentOffset.y + geometry.contentInsets.top + geometry.containerSize.height
@@ -380,13 +372,6 @@ struct AskView<Tools: View>: View {
             AskProgressRail(marks: marks, current: current) { id in
                 isTyping = false
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
-            } onPan: { translation, ended in
-                let y = railPan.target(for: translation, ended: ended)
-                if ended {
-                    withAnimation(.smooth) { scrollPosition.scrollTo(y: y) }
-                } else {
-                    scrollPosition.scrollTo(y: y)
-                }
             }
             .padding(.trailing, 2)
         }
@@ -555,25 +540,6 @@ private struct AskShoppingPresentation: Identifiable {
     let source: ShoppingDesignSource?
     let decisionID: String?
     let onDecision: (Wire.WardrobeDecisionResponse) -> Void
-}
-
-private struct ScrollBounds: Equatable {
-    var offset: CGFloat = 0
-    var top: CGFloat = 0
-    var bottom: CGFloat = 0
-}
-
-/// Scroll state for panning from the progress rail. A plain class so that
-/// recording the offset on every scrolled frame does not re-render the page.
-@MainActor private final class RailPan {
-    var bounds = ScrollBounds()
-    private var start: CGFloat?
-
-    func target(for translation: CGFloat, ended: Bool) -> CGFloat {
-        let origin = start ?? bounds.offset
-        start = ended ? nil : origin
-        return min(max(origin - translation, bounds.top), bounds.bottom)
-    }
 }
 
 private enum AskScrollTarget: Hashable, Sendable {

@@ -1,9 +1,9 @@
 import SwiftUI
 
-/// One tick per question along the trailing edge of a conversation. The tick
-/// of the question in view is marked; tapping a tick jumps to it. Holding the
-/// rail briefly before dragging shows each question and jumps on release, so a
-/// quick swipe that starts on the rail still scrolls the page.
+/// One tick per question along the trailing edge of a conversation, like the
+/// section index of a contact list. The tick of the question in view is
+/// marked; touching the rail shows the question under the finger and jumps
+/// there on release. The rail does not scroll the page.
 struct AskProgressRail: View {
     struct Mark: Identifiable, Equatable {
         let id: UUID
@@ -13,12 +13,9 @@ struct AskProgressRail: View {
     let marks: [Mark]
     let current: UUID?
     let onSelect: (UUID) -> Void
-    /// A quick drag that starts on the rail scrolls the page: the rail sits
-    /// above the scroll view, so its touches would never reach it otherwise.
-    /// Called with the vertical translation, and the predicted one on release.
-    let onPan: (_ translation: CGFloat, _ ended: Bool) -> Void
 
-    @State private var scrubbing: Int?
+    /// Resets on its own when the system cancels the touch.
+    @GestureState private var scrubbing: Int?
 
     private static let maxHeight: CGFloat = 320
     /// Only as wide as the ticks, so it stays out of the text column.
@@ -42,8 +39,7 @@ struct AskProgressRail: View {
         .frame(width: Self.width, alignment: .trailing)
         .padding(.vertical, Spacing.tight)
         .contentShape(.rect)
-        .onTapGesture { location in onSelect(marks[index(at: location.y)].id) }
-        .gesture(scrub.exclusively(before: pan))
+        .gesture(scrub)
         .overlay(alignment: .topTrailing) { preview }
         .animation(.snappy(duration: 0.15), value: scrubbing ?? currentIndex)
         .sensoryFeedback(.selection, trigger: scrubbing) { _, new in new != nil }
@@ -62,22 +58,11 @@ struct AskProgressRail: View {
         min(max(Int((y - Spacing.tight) / pitch), 0), marks.count - 1)
     }
 
-    private var pan: some Gesture {
-        DragGesture(minimumDistance: 4)
-            .onChanged { onPan($0.translation.height, false) }
-            .onEnded { onPan($0.predictedEndTranslation.height, true) }
-    }
-
+    /// Starts on touch-down; lifting without moving is a tap on that tick.
     private var scrub: some Gesture {
-        LongPressGesture(minimumDuration: 0.2)
-            .sequenced(before: DragGesture(minimumDistance: 0))
-            .onChanged { value in
-                if case let .second(true, drag?) = value { scrubbing = index(at: drag.location.y) }
-            }
-            .onEnded { _ in
-                if let scrubbing, marks.indices.contains(scrubbing) { onSelect(marks[scrubbing].id) }
-                scrubbing = nil
-            }
+        DragGesture(minimumDistance: 0)
+            .updating($scrubbing) { value, state, _ in state = index(at: value.location.y) }
+            .onEnded { onSelect(marks[index(at: $0.location.y)].id) }
     }
 
     @ViewBuilder private var preview: some View {
