@@ -256,6 +256,11 @@ final class WalkthroughTests: XCTestCase {
         XCTAssert(newConversation.isHittable, "New conversation should stay pinned on screen")
         let atEnd = rail.value as? String
 
+        // Near the end the page cannot scroll a question to the top; the picked one stays current.
+        rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 1)).withOffset(CGVector(dx: 0, dy: -20)).tap()
+        settle(2)
+        XCTAssert((rail.value as? String)?.hasPrefix("第6问") == true, "The picked question should stay current at the end")
+
         // Tapping the first tick jumps to the first question.
         rail.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0)).withOffset(CGVector(dx: 0, dy: 10)).tap()
         settle(2)

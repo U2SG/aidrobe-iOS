@@ -16,6 +16,9 @@ struct AskView<Tools: View>: View {
     /// Turns whose question has scrolled up to the pinned bar.
     @State private var passedTurns: Set<UUID> = []
     @State private var isAtBottom = false
+    /// The question last picked on the rail. It stays current until the page is
+    /// dragged by hand, because a jump near the end cannot always bring it to the top.
+    @State private var pickedTurn: UUID?
     @State private var topInset: CGFloat = 0
     @FocusState private var isTyping: Bool
     private let tools: Tools
@@ -194,7 +197,11 @@ struct AskView<Tools: View>: View {
         .overlay(alignment: .trailing) { progressRail(model) }
         .scrollEdgeEffectStyle(.soft, for: .top)
         .scrollDismissesKeyboard(.interactively)
+        .onScrollPhaseChange { _, phase in
+            if phase == .interacting { pickedTurn = nil }
+        }
         .onChange(of: model.entries.last?.id, initial: true) { _, id in
+            pickedTurn = nil
             if let id {
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
@@ -367,10 +374,12 @@ struct AskView<Tools: View>: View {
         if marks.count > 1 {
             // The question nearest the top: the last one past the line, or
             // the last question once the page cannot scroll any further.
-            let current = isAtBottom ? marks.last?.id
-                : marks.last { passedTurns.contains($0.id) }?.id ?? marks.first?.id
+            let current = if let pickedTurn, marks.contains(where: { $0.id == pickedTurn }) { pickedTurn }
+                else if isAtBottom { marks.last?.id }
+                else { marks.last { passedTurns.contains($0.id) }?.id ?? marks.first?.id }
             AskProgressRail(marks: marks, current: current) { id in
                 isTyping = false
+                pickedTurn = id
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
             .padding(.trailing, 2)
