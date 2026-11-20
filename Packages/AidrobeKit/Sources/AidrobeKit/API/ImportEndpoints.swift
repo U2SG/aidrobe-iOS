@@ -11,12 +11,14 @@ extension Endpoints {
     }
 
     /// Creates an import task. `idempotencyKey` makes retries return the same task.
+    /// `conversationID` links it to an Ask conversation, which then lists it.
     public static func createImport(
         imageURL: String,
         inputType: ImportInputType,
         source: ImportSourceType,
         idempotencyKey: String,
-        locale: String? = nil
+        locale: String? = nil,
+        conversationID: String? = nil
     ) throws -> Endpoint<Wire.ImportTaskResponse> {
         try Endpoint(
             .post,
@@ -25,7 +27,8 @@ extension Endpoints {
                 inputType: inputType.rawValue,
                 sourceType: source.rawValue,
                 imageUrl: imageURL,
-                locale: locale
+                locale: locale,
+                conversationId: conversationID
             ),
             headers: ["Idempotency-Key": idempotencyKey]
         )
@@ -47,6 +50,18 @@ extension Endpoints {
         _ request: Wire.ConfirmImportRequest
     ) throws -> Endpoint<Wire.ConfirmImportResponse> {
         try Endpoint(.post, "/v1/import-tasks/\(taskID)/confirm", json: request)
+    }
+
+    /// Prefills the waiting candidates from the user's words (include, name,
+    /// price, material). Nothing is added to the wardrobe. 409 when the task is
+    /// no longer waiting; 503 leaves the candidates as they were.
+    public static func applyImportNote(taskID: String, note: String) throws -> Endpoint<Wire.ImportTaskResponse> {
+        try Endpoint(
+            .post,
+            "/v1/import-tasks/\(taskID)/apply-note",
+            json: Wire.ApplyImportNoteRequest(note: note),
+            timeout: Endpoint<Wire.ImportTaskResponse>.slowTimeout
+        )
     }
 
     public static func confirmImportItems(

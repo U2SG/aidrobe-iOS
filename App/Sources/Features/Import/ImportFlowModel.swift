@@ -30,34 +30,20 @@ final class ImportFlowModel {
         }
     }
 
-    /// One candidate as edited on the confirm form.
-    struct CandidateDraft: Identifiable {
-        var id: String { tempItemID ?? "single" }
-        let tempItemID: String?
-        var include: Bool
-        var title: String
-        var category: String
-        var color: String
-        let imageURL: URL?
-        let imageCaption: String
-        let alreadyConfirmed: Bool
-        let possibleDuplicates: [Wire.ImportDuplicateHint]
-        /// Mostly covered by an outer layer in the photo; the backend makes no product image for it.
-        var partiallyHidden = false
-    }
+    typealias CandidateDraft = ImportPipeline.CandidateDraft
 
     private(set) var jobs: [Job] = []
     private(set) var pendingError: String?
     private(set) var isLoadingPending = false
     private let api: APIClient
-    private let uploader: PresignedUploader
+    private let pipeline: ImportPipeline
     private let store: UserDefaults
     private let accountGeneration = AccountLocalData.generation
     static let pendingKey = "aidrobe.pendingImportTasks"
 
     init(api: APIClient, store: UserDefaults = .standard) {
         self.api = api
-        self.uploader = PresignedUploader(api: api)
+        self.pipeline = ImportPipeline(api: api)
         self.store = store
     }
 
@@ -134,34 +120,30 @@ final class ImportFlowModel {
     private func run(
         _ id: UUID, image: UIImage, source: Endpoints.ImportSourceType, input: Endpoints.ImportInputType
     ) async {
-        guard let data = ImageCompressor.jpegData(from: image) else {
-            return update(id) { $0.phase = .failed("图片无法读取") }
-        }
         do {
-            let upload = try await uploader.upload(data, fileName: "\(id.uuidString).jpg", contentType: "image/jpeg")
-            guard accountGeneration == AccountLocalData.generation else { return }
-            update(id) { $0.phase = .recognising }
             // The job id doubles as the idempotency key: a retried create
             // returns the same task instead of a duplicate.
-            let task = try await api.send(Endpoints.createImport(
-                imageURL: upload.fileURL.absoluteString,
-                inputType: input,
-                source: source,
-                idempotencyKey: id.uuidString
-            ))
+            let task = try await pipeline.start(
+                image, key: id, source: source, input: input,
+                onUploaded: { [weak self] in
+                    guard let self, self.accountGeneration == AccountLocalData.generation else { throw CancellationError() }
+                    self.update(id) { $0.phase = .recognising }
+                }
+            )
+            guard accountGeneration == AccountLocalData.generation else { return }
             update(id) { $0.taskID = task.taskId }
             remember(task.taskId)
             await poll(id, taskID: task.taskId)
+        } catch is CancellationError {
+            return
         } catch {
-            update(id) { $0.phase = .failed(userMessage(for: error)) }
+            update(id) { $0.phase = .failed(ImportPipeline.message(for: error)) }
         }
     }
 
     private func poll(_ id: UUID, taskID: String) async {
         do {
-            let outcome = try await ImportPolling.waitForRecognition { [api] in
-                try await api.send(Endpoints.importTask(taskID))
-            }
+            let outcome = try await pipeline.waitForRecognition(taskID)
             switch outcome {
             case let .waitingConfirm(task) where task.status == "completed":
                 forget(taskID)
@@ -170,7 +152,7 @@ final class ImportFlowModel {
                 update(id) { $0.phase = .needsConfirm(task) }
             case let .failed(_, message):
                 forget(taskID)
-                update(id) { $0.phase = .failed(message ?? "没能识别这张照片，可以换一张试试") }
+                update(id) { $0.phase = .failed(message ?? ImportPipeline.recognitionFailed) }
             case .timedOut:
                 update(id) { $0.phase = .interrupted }
             }
@@ -187,24 +169,7 @@ final class ImportFlowModel {
     // MARK: Confirm
 
     func drafts(for task: Wire.ImportTaskResponse) -> [CandidateDraft] {
-        let candidates = task.candidateItems?.isEmpty == false
-            ? task.candidateItems ?? []
-            : [task.candidateItem].compactMap { $0 }
-        return candidates.map { candidate in
-            CandidateDraft(
-                tempItemID: candidate.tempItemId,
-                include: candidate.possibleDuplicates?.isEmpty != false && (candidate.shouldImport ?? true),
-                title: candidate.displayName ?? candidate.title,
-                category: candidate.category,
-                color: candidate.colorMain,
-                imageURL: URL(string: candidate.cutoutImageUrl ?? candidate.cropImageUrl ?? candidate.originalImageUrl),
-                imageCaption: candidate.cutoutImageUrl != nil ? "AI 单品图"
-                    : candidate.cropImageUrl != nil ? "原照裁剪" : "原照 · 暂无单品图",
-                alreadyConfirmed: candidate.confirmedItemId != nil,
-                possibleDuplicates: candidate.possibleDuplicates ?? [],
-                partiallyHidden: candidate.visibility == "partially_hidden"
-            )
-        }
+        ImportPipeline.drafts(for: task)
     }
 
     /// Confirms selected candidates and dismisses the rest when submitted.
@@ -212,23 +177,7 @@ final class ImportFlowModel {
         let selected = drafts.filter { $0.include && !$0.alreadyConfirmed }
         update(jobID) { $0.phase = .confirming }
         do {
-            if selected.count == 1, let draft = selected.first, draft.tempItemID == nil {
-                _ = try await api.send(Endpoints.confirmImport(
-                    taskID: task.taskId,
-                    Wire.ConfirmImportRequest(title: draft.title, category: draft.category, colorMain: draft.color)
-                ))
-            } else {
-                let items = selected.compactMap { draft -> Wire.ConfirmItemInput? in
-                    guard let tempID = draft.tempItemID else { return nil }
-                    return Wire.ConfirmItemInput(
-                        tempItemId: tempID, title: draft.title, category: draft.category, colorMain: draft.color
-                    )
-                }
-                // Unselected candidates are skipped when the review is submitted.
-                _ = try await api.send(Endpoints.confirmImportItems(
-                    taskID: task.taskId, Wire.ConfirmItemsRequest(items: items, dismissRemaining: true)
-                ))
-            }
+            try await pipeline.confirm(task, drafts: drafts)
             forget(task.taskId)
             if selected.isEmpty {
                 jobs.removeAll { $0.id == jobID }
@@ -266,5 +215,132 @@ final class ImportFlowModel {
     private func forget(_ taskID: String) {
         guard accountGeneration == AccountLocalData.generation else { return }
         store.set(pendingTaskIDs.filter { $0 != taskID }, forKey: Self.pendingKey)
+    }
+}
+
+/// Building blocks shared by the import sheet and photos sent in Ask: upload a
+/// photo and create its task, wait for recognition, turn a task into editable
+/// drafts, and confirm the chosen ones (dismissing the rest).
+struct ImportPipeline {
+    /// One candidate as edited before it goes into the wardrobe.
+    struct CandidateDraft: Identifiable {
+        var id: String { tempItemID ?? "single" }
+        let tempItemID: String?
+        var include: Bool
+        var title: String
+        var category: String
+        var color: String
+        let imageURL: URL?
+        /// The part of the original photo (crop, else the whole photo).
+        let photoURL: URL?
+        let imageCaption: String
+        let alreadyConfirmed: Bool
+        let possibleDuplicates: [Wire.ImportDuplicateHint]
+        /// Mostly covered by an outer layer in the photo; the backend makes no product image for it.
+        var partiallyHidden = false
+        /// Backend `material` value, empty when unknown.
+        var material = ""
+        /// Price as typed; only sent when the caller shows the field.
+        var price = ""
+    }
+
+    struct UnreadableImage: Error {}
+
+    static let recognitionFailed = "没能识别这张照片，可以换一张试试"
+
+    let api: APIClient
+    let uploader: PresignedUploader
+
+    init(api: APIClient) {
+        self.api = api
+        self.uploader = PresignedUploader(api: api)
+    }
+
+    static func message(for error: any Error) -> String {
+        error is UnreadableImage ? "图片无法读取" : userMessage(for: error)
+    }
+
+    /// Compresses and uploads the photo, then creates its import task. `key`
+    /// is the idempotency key, so a retry returns the same task.
+    @MainActor
+    func start(
+        _ image: UIImage, key: UUID, source: Endpoints.ImportSourceType, input: Endpoints.ImportInputType,
+        conversationID: String? = nil, onUploaded: () throws -> Void = {}
+    ) async throws -> Wire.ImportTaskResponse {
+        guard let data = ImageCompressor.jpegData(from: image) else { throw UnreadableImage() }
+        let upload = try await uploader.upload(data, fileName: "\(key.uuidString).jpg", contentType: "image/jpeg")
+        try onUploaded()
+        return try await api.send(Endpoints.createImport(
+            imageURL: upload.fileURL.absoluteString,
+            inputType: input,
+            source: source,
+            idempotencyKey: key.uuidString,
+            conversationID: conversationID
+        ))
+    }
+
+    func waitForRecognition(_ taskID: String) async throws -> ImportPolling.Outcome {
+        try await ImportPolling.waitForRecognition { [api] in
+            try await api.send(Endpoints.importTask(taskID))
+        }
+    }
+
+    static func candidates(of task: Wire.ImportTaskResponse) -> [Wire.CandidateItem] {
+        task.candidateItems?.isEmpty == false ? task.candidateItems ?? [] : [task.candidateItem].compactMap { $0 }
+    }
+
+    static func drafts(for task: Wire.ImportTaskResponse) -> [CandidateDraft] {
+        candidates(of: task).map { candidate in
+            CandidateDraft(
+                tempItemID: candidate.tempItemId,
+                include: candidate.possibleDuplicates?.isEmpty != false && (candidate.shouldImport ?? true),
+                title: candidate.displayName ?? candidate.title,
+                category: candidate.category,
+                color: candidate.colorMain,
+                imageURL: URL(string: candidate.cutoutImageUrl ?? candidate.cropImageUrl ?? candidate.originalImageUrl),
+                photoURL: URL(string: candidate.cropImageUrl ?? candidate.originalImageUrl),
+                imageCaption: candidate.cutoutImageUrl != nil ? "AI 单品图"
+                    : candidate.cropImageUrl != nil ? "原照裁剪" : "原照 · 暂无单品图",
+                alreadyConfirmed: candidate.confirmedItemId != nil,
+                possibleDuplicates: candidate.possibleDuplicates ?? [],
+                partiallyHidden: candidate.visibility == "partially_hidden",
+                material: candidate.material?.lowercased() ?? "",
+                price: candidate.purchasePrice.flatMap(Double.init).map {
+                    $0.formatted(.number.precision(.fractionLength(0...2)).grouping(.never))
+                } ?? ""
+            )
+        }
+    }
+
+    /// Parses a typed price in the field's locale, then plain ASCII; nil when empty or invalid.
+    static func price(_ text: String) -> Double? {
+        let text = text.trimmingCharacters(in: .whitespaces)
+        guard !text.isEmpty else { return nil }
+        let value = (try? Double(text, format: .number.grouping(.never))) ?? Double(text.replacingOccurrences(of: ",", with: "."))
+        return value.flatMap { $0 >= 0 ? $0 : nil }
+    }
+
+    /// Confirms the selected drafts and dismisses the rest of the task.
+    func confirm(_ task: Wire.ImportTaskResponse, drafts: [CandidateDraft], sendsPrice: Bool = false) async throws {
+        let selected = drafts.filter { $0.include && !$0.alreadyConfirmed }
+        if selected.count == 1, let draft = selected.first, draft.tempItemID == nil {
+            _ = try await api.send(Endpoints.confirmImport(
+                taskID: task.taskId,
+                Wire.ConfirmImportRequest(title: draft.title, category: draft.category, colorMain: draft.color)
+            ))
+            return
+        }
+        let items = selected.compactMap { draft -> Wire.ConfirmItemInput? in
+            guard let tempID = draft.tempItemID else { return nil }
+            return Wire.ConfirmItemInput(
+                tempItemId: tempID, title: draft.title, category: draft.category, colorMain: draft.color,
+                purchasePrice: sendsPrice ? Self.price(draft.price).map { .init(value1: $0) } : nil,
+                material: draft.material.isEmpty ? nil : draft.material
+            )
+        }
+        // Unselected candidates are skipped when the review is submitted.
+        _ = try await api.send(Endpoints.confirmImportItems(
+            taskID: task.taskId, Wire.ConfirmItemsRequest(items: items, dismissRemaining: true)
+        ))
     }
 }
