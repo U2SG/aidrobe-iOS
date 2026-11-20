@@ -24,6 +24,10 @@ final class AskPhotoImportModel {
         /// Kept for a retry after a failed upload or recognition; restored photos have none.
         var image: UIImage?
         var taskID: String?
+        /// Idempotency key for creating this photo's import task. Kept across transport failures so a
+        /// task the server created (but whose response was lost) is returned instead of duplicated;
+        /// replaced only when a created task's recognition itself failed.
+        var creationKey = UUID()
         var phase: Phase
         var drafts: [ImportPipeline.CandidateDraft] = []
         var noteFailed = false
@@ -136,6 +140,7 @@ final class AskPhotoImportModel {
         case .failed where photo.image != nil:
             update(batchID, photoID) {
                 $0.phase = .uploading
+                if $0.taskID != nil { $0.creationKey = UUID() }  // recognition failed: a new task is needed
                 $0.taskID = nil
             }
             await run(batchID, photoID)
@@ -172,13 +177,12 @@ final class AskPhotoImportModel {
     // MARK: Pipeline
 
     private func run(_ batchID: UUID, _ photoID: UUID) async {
-        guard let image = photo(batchID, photoID)?.image,
+        guard let photo = photo(batchID, photoID), let image = photo.image,
               let conversationID = batches.first(where: { $0.id == batchID }).map(\.conversationID) else { return }
         let expectedEpoch = epoch
         do {
-            // A fresh key per attempt: retrying a failed recognition needs a new task.
             let task = try await pipeline.start(
-                image, key: UUID(), source: .album, input: .outfitImage, conversationID: conversationID,
+                image, key: photo.creationKey, source: .album, input: .outfitImage, conversationID: conversationID,
                 onUploaded: { [weak self] in
                     guard let self, self.isCurrent(expectedEpoch) else { throw CancellationError() }
                     self.update(batchID, photoID) { $0.phase = .recognising }
@@ -323,13 +327,17 @@ struct AskPhotoImportCard: View {
                     Task { await model.confirm(batchID, sendsPrice: showsPrice) }
                 } label: {
                     Group {
-                        if isConfirming { ProgressView() } else { Text("加入衣橱（\(count) 件）") }
+                        if isConfirming {
+                            ProgressView()
+                        } else {
+                            Text(count == 0 ? "都不要，结束这次导入" : "加入衣橱（\(count) 件）")
+                        }
                     }
                     .frame(maxWidth: .infinity)
                 }
                 .buttonStyle(.glassProminent)
                 .controlSize(.large)
-                .disabled(isConfirming || count == 0 || hasEmptyTitle(photos))
+                .disabled(isConfirming || (count > 0 && hasEmptyTitle(photos)))
                 .accessibilityIdentifier("ask.import.confirm")
             }
         }
