@@ -11,6 +11,7 @@ struct ItemDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var showsOriginalPhoto = false
     @State private var isEditing = false
+    @State private var editsPrice = false
     @State private var confirmsDelete = false
     @State private var notice: String?
     @State private var isRecognizing = false
@@ -116,6 +117,14 @@ struct ItemDetailView: View {
                     if let seasons = Garment.seasons(item.seasonTags) {
                         FactRow(title: "季节") { Text(seasons) }
                     }
+                    FactRow(title: "买时价格") {
+                        Button(item.purchasePrice.map(Garment.price) ?? "添加价格") {
+                            editsPrice = true
+                            isEditing = true
+                        }
+                        .foregroundStyle(item.purchasePrice == nil ? Color.accent : Color.label)
+                        .frame(minHeight: 44)
+                    }
                     if let material = item.material, !material.isEmpty {
                         FactRow(title: "材质") { Text(Garment.material(material)) }
                     }
@@ -158,12 +167,15 @@ struct ItemDetailView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu("更多", systemImage: "ellipsis") {
-                    Button("修改", systemImage: "pencil") { isEditing = true }
+                    Button("修改", systemImage: "pencil") {
+                        editsPrice = false
+                        isEditing = true
+                    }
                     Button("从衣橱移除", systemImage: "trash", role: .destructive) { confirmsDelete = true }
                 }
             }
         }
-        .sheet(isPresented: $isEditing) { ItemEditSheet(item: item) }
+        .sheet(isPresented: $isEditing) { ItemEditSheet(item: item, focusesPrice: editsPrice) }
         .fullScreenCover(isPresented: $showsOriginalPhoto) {
             OriginalGarmentPhoto {
                 try await store.originalPhotoURL(item.itemId) ?? WardrobeStore.originalURL(item)
@@ -347,6 +359,7 @@ private struct ZoomableGarmentPhoto: UIViewRepresentable {
 private struct ItemEditSheet: View {
     let item: Wire.WardrobeItemResponse
     let recognition: Wire.WardrobeRecognitionResponse?
+    let focusesPrice: Bool
     @Environment(AppModel.self) private var app
     @Environment(\.dismiss) private var dismiss
     @State private var name: String
@@ -355,11 +368,15 @@ private struct ItemEditSheet: View {
     @State private var material: String
     @State private var seasons: Set<String>
     @State private var formality: Int
+    @State private var price: String
     @State private var failure: String?
+    @FocusState private var priceFocused: Bool
 
-    init(item: Wire.WardrobeItemResponse, recognition: Wire.WardrobeRecognitionResponse? = nil) {
+    init(item: Wire.WardrobeItemResponse, recognition: Wire.WardrobeRecognitionResponse? = nil, focusesPrice: Bool = false) {
         self.item = item
         self.recognition = recognition
+        self.focusesPrice = focusesPrice
+        _price = State(initialValue: item.purchasePrice.map { $0.formatted(.number.precision(.fractionLength(0...2)).grouping(.never)) } ?? "")
         _name = State(initialValue: recognition?.title ?? item.displayName)
         _category = State(initialValue: recognition?.category ?? item.category)
         _color = State(initialValue: (recognition?.colorMain ?? item.colorMain).lowercased())
@@ -414,6 +431,22 @@ private struct ItemEditSheet: View {
                              : "确认名称、分类和颜色后保存。")
                     }
                 }
+                if recognition == nil {
+                    Section {
+                        HStack {
+                            Text("买时价格")
+                            Spacer()
+                            Text("¥").foregroundStyle(Color.secondaryLabel)
+                            TextField("没记录", text: $price)
+                                .keyboardType(.decimalPad)
+                                .multilineTextAlignment(.trailing)
+                                .focused($priceFocused)
+                                .fixedSize()
+                        }
+                    } footer: {
+                        Text("记上价格，衣橱洞察会算出每穿一次多少钱。")
+                    }
+                }
             }
             .scrollContentBackground(.hidden)
             .background(Color.groupedBackground)
@@ -435,7 +468,8 @@ private struct ItemEditSheet: View {
                                     material: material.isEmpty ? nil : material,
                                     seasonTags: Garment.seasonOptions.map(\.key).filter(seasons.contains)
                                         .compactMap(Wire.UpdateWardrobeItemRequest.SeasonTagsPayloadPayload.init(rawValue:)),
-                                    formalityScore: formality == 0 ? nil : formality
+                                    formalityScore: formality == 0 ? nil : formality,
+                                    purchasePrice: parsedPrice
                                 ))
                                 dismiss()
                             } catch {
@@ -443,11 +477,26 @@ private struct ItemEditSheet: View {
                             }
                         }
                     }
-                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty)
+                    .disabled(name.trimmingCharacters(in: .whitespaces).isEmpty || !priceIsValid)
                 }
+            }
+            .task {
+                // Focus only takes once the sheet has finished presenting.
+                guard focusesPrice else { return }
+                try? await Task.sleep(for: .milliseconds(600))
+                priceFocused = true
             }
         }
         .presentationDetents([.large])
+    }
+
+    /// nil leaves the stored price as it is (the backend has no way to clear it).
+    private var parsedPrice: Double? {
+        Double(price.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+    }
+
+    private var priceIsValid: Bool {
+        price.trimmingCharacters(in: .whitespaces).isEmpty || (parsedPrice.map { $0 >= 0 && $0.isFinite } ?? false)
     }
 
     /// "All year" and the individual seasons exclude each other.
