@@ -12,13 +12,17 @@ extension Endpoints {
 
     /// Creates an import task. `idempotencyKey` makes retries return the same task.
     /// `conversationID` links it to an Ask conversation, which then lists it.
+    /// Album scans pass one `batchID` per run and the photo's day as `takenAt`
+    /// (`YYYY-MM-DD`); batch tasks stay out of the pending list.
     public static func createImport(
         imageURL: String,
         inputType: ImportInputType,
         source: ImportSourceType,
         idempotencyKey: String,
         locale: String? = nil,
-        conversationID: String? = nil
+        conversationID: String? = nil,
+        batchID: String? = nil,
+        takenAt: String? = nil
     ) throws -> Endpoint<Wire.ImportTaskResponse> {
         try Endpoint(
             .post,
@@ -28,7 +32,9 @@ extension Endpoints {
                 sourceType: source.rawValue,
                 imageUrl: imageURL,
                 locale: locale,
-                conversationId: conversationID
+                conversationId: conversationID,
+                batchId: batchID,
+                takenAt: takenAt
             ),
             headers: ["Idempotency-Key": idempotencyKey]
         )
@@ -69,6 +75,20 @@ extension Endpoints {
         _ request: Wire.ConfirmItemsRequest
     ) throws -> Endpoint<Wire.ConfirmItemsResponse> {
         try Endpoint(.post, "/v1/import-tasks/\(taskID)/confirm-items", json: request)
+    }
+}
+
+extension Endpoints {
+    /// Garments found across an album scan, merged per garment. Poll until `complete`.
+    public static func importBatch(_ batchID: String) -> Endpoint<Wire.ImportBatchResponse> {
+        Endpoint(.get, "/v1/import-batches/\(batchID)")
+    }
+
+    /// create / link / skip per group; 409 `unknown_group` / `group_confirmed` → reload.
+    public static func confirmImportBatch(
+        _ batchID: String, _ request: Wire.ConfirmImportBatchRequest
+    ) throws -> Endpoint<Wire.ConfirmImportBatchResponse> {
+        try Endpoint(.post, "/v1/import-batches/\(batchID)/confirm", json: request)
     }
 }
 

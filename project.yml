@@ -47,7 +47,7 @@ targets:
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: 拍摄衣物照片，导入你的衣橱。
-        NSPhotoLibraryUsageDescription: 从相册选择衣物或穿搭照片，导入你的衣橱。
+        NSPhotoLibraryUsageDescription: 从相册选择衣物或穿搭照片导入衣橱；扫描你选定的穿搭相册时，在手机上先筛掉截图和多人照片，只上传需要识别的照片。
         NSPhotoLibraryAddUsageDescription: 保存搭配图片到相册。
         NSLocationWhenInUseUsageDescription: 根据你所在城市的天气推荐今日穿搭。
         NSAppTransportSecurity:

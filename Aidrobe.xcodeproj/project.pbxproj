@@ -18,18 +18,22 @@
 		29EC67DC179F59663C9D73CD /* ItemDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */; };
 		2AC23C889C751EF68082550A /* WalkthroughTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7AF1CF92CA5320F852850954 /* WalkthroughTests.swift */; };
 		2BCAE6DA805946BDBE8AD491 /* PackingModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F3A865C1CD5731F7DD19FCAB /* PackingModel.swift */; };
+		2C4DAF831BC8219D37BF8ADF /* AlbumScanModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 884677C2215F986B1BE94BEF /* AlbumScanModel.swift */; };
 		2CD534AEADB8E307336DE3E3 /* ImportFlowModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */; };
 		2F94981E4C84EB3B67DE5FBD /* ShouldIBuyModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BAF141486CF4A14BEF02C5BE /* ShouldIBuyModel.swift */; };
 		3831AFA216B3B13DC5A30CC1 /* TodayModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7287219AD96948E57CCA4CFD /* TodayModel.swift */; };
 		3E1C100F6389EB39EC5A0EA8 /* JournalView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A02922B5FF3319CCDA6EACCB /* JournalView.swift */; };
 		4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */; };
 		4C0BA20B498B2E5271F1B233 /* ProfileModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4AEC3134D3C93DEF3BDE8091 /* ProfileModel.swift */; };
+		508550A0865E390E278FA659 /* AlbumScanView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F7B1E90D3B3033258F498F52 /* AlbumScanView.swift */; };
 		5A54C2BF4C4B9FE167736A02 /* AskPhotoImport.swift in Sources */ = {isa = PBXBuildFile; fileRef = FAFCBFCABC028055FD092B5C /* AskPhotoImport.swift */; };
 		5C0C3B79ACF066F7F7B37AD7 /* AidrobeKit in Frameworks */ = {isa = PBXBuildFile; productRef = 0730BC3AB439776772100C62 /* AidrobeKit */; };
 		62B421215558DCBB4C11386C /* PackingListsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0AD06459FDBCD47AB94C1F02 /* PackingListsView.swift */; };
+		79C1BE8D93EC3E68EF2B957E /* AlbumScanResultsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = F12865F13E2C3EDC8D225393 /* AlbumScanResultsView.swift */; };
 		7D5353BF6974C2B372A56C22 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */; };
 		80AE3B8CE8F3E1F7ECB2766D /* WardrobeView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */; };
 		8130158784309756D1586D33 /* Vocabulary.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */; };
+		8877CC25FC926C6AC7363F26 /* AlbumLibrary.swift in Sources */ = {isa = PBXBuildFile; fileRef = CD4FCC8A1F2B786DDE82B1C3 /* AlbumLibrary.swift */; };
 		95088BE4DF1ECFA17B00A38D /* AskProgressRail.swift in Sources */ = {isa = PBXBuildFile; fileRef = 73D91470B5C03AE691E963A1 /* AskProgressRail.swift */; };
 		956E0F478DEC95B23D7BD20F /* StyleInspirationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA33D7B9D2DEA8DA0F010AB0 /* StyleInspirationView.swift */; };
 		97928188994D3A553EB7A3C6 /* ImportFlowView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */; };
@@ -88,6 +92,7 @@
 		7D7D2EF10AE168316588D79A /* OnboardingFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OnboardingFlowView.swift; sourceTree = "<group>"; };
 		8587F1AAA07682D6879F836A /* TodaySheets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodaySheets.swift; sourceTree = "<group>"; };
 		862ADEECC4DFCE04D2B0CCFD /* ItemDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ItemDetailView.swift; sourceTree = "<group>"; };
+		884677C2215F986B1BE94BEF /* AlbumScanModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumScanModel.swift; sourceTree = "<group>"; };
 		88F0A220DA8F46419E1AB257 /* GarmentImage.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GarmentImage.swift; sourceTree = "<group>"; };
 		8A6E055ACBE62F01F6D90166 /* Vocabulary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Vocabulary.swift; sourceTree = "<group>"; };
 		8E1A53F1A45C63768FBDF85B /* WardrobeView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WardrobeView.swift; sourceTree = "<group>"; };
@@ -102,6 +107,7 @@
 		BAF141486CF4A14BEF02C5BE /* ShouldIBuyModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ShouldIBuyModel.swift; sourceTree = "<group>"; };
 		BD5E6CD34C6DCE6CA33F1231 /* ImportFlowView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowView.swift; sourceTree = "<group>"; };
 		C55B817D837B476FB900D829 /* OutfitShareSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = OutfitShareSheet.swift; sourceTree = "<group>"; };
+		CD4FCC8A1F2B786DDE82B1C3 /* AlbumLibrary.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumLibrary.swift; sourceTree = "<group>"; };
 		D208FFC292AEFE6D9EAF8009 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		D210CA35601FEB21C4D7A511 /* AidrobeApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AidrobeApp.swift; sourceTree = "<group>"; };
 		D43FF8ABA3CFC7C7982DEFD9 /* TodayView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TodayView.swift; sourceTree = "<group>"; };
@@ -109,8 +115,10 @@
 		E636373E92357B9B4DA9EB71 /* ImportDemo.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportDemo.swift; sourceTree = "<group>"; };
 		EB1C7B55367716B9AFCF1840 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Debug.xcconfig; sourceTree = "<group>"; };
 		F038BBD453873CAB8D0919C6 /* AskView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskView.swift; sourceTree = "<group>"; };
+		F12865F13E2C3EDC8D225393 /* AlbumScanResultsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumScanResultsView.swift; sourceTree = "<group>"; };
 		F22E49B3F3EAC75AE36FDDB1 /* ImportFlowModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ImportFlowModel.swift; sourceTree = "<group>"; };
 		F3A865C1CD5731F7DD19FCAB /* PackingModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PackingModel.swift; sourceTree = "<group>"; };
+		F7B1E90D3B3033258F498F52 /* AlbumScanView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AlbumScanView.swift; sourceTree = "<group>"; };
 		FAFCBFCABC028055FD092B5C /* AskPhotoImport.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AskPhotoImport.swift; sourceTree = "<group>"; };
 		FE7A6B0F2E23B76C560624D1 /* FavoriteOutfitsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FavoriteOutfitsView.swift; sourceTree = "<group>"; };
 		FEFE39D7A23B90AE77A4A6DE /* Aidrobe.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = Aidrobe.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -228,6 +236,17 @@
 			path = Ask;
 			sourceTree = "<group>";
 		};
+		45B2B1450DCF1A5E712A68F2 /* AlbumScan */ = {
+			isa = PBXGroup;
+			children = (
+				CD4FCC8A1F2B786DDE82B1C3 /* AlbumLibrary.swift */,
+				884677C2215F986B1BE94BEF /* AlbumScanModel.swift */,
+				F12865F13E2C3EDC8D225393 /* AlbumScanResultsView.swift */,
+				F7B1E90D3B3033258F498F52 /* AlbumScanView.swift */,
+			);
+			path = AlbumScan;
+			sourceTree = "<group>";
+		};
 		49B1A008191E5A2C86AD4365 /* Config */ = {
 			isa = PBXGroup;
 			children = (
@@ -314,6 +333,7 @@
 			isa = PBXGroup;
 			children = (
 				3654CB7791101D52F2831FB4 /* Account */,
+				45B2B1450DCF1A5E712A68F2 /* AlbumScan */,
 				406A91D945869DAEC70DAE30 /* Ask */,
 				BDE05A2D1838802ED6CF6965 /* Import */,
 				86ACFB48F28E24DFCE75BD1E /* Insights */,
@@ -466,6 +486,10 @@
 			buildActionMask = 2147483647;
 			files = (
 				4B738A3B270BDB5F6B7D2E09 /* AidrobeApp.swift in Sources */,
+				8877CC25FC926C6AC7363F26 /* AlbumLibrary.swift in Sources */,
+				2C4DAF831BC8219D37BF8ADF /* AlbumScanModel.swift in Sources */,
+				79C1BE8D93EC3E68EF2B957E /* AlbumScanResultsView.swift in Sources */,
+				508550A0865E390E278FA659 /* AlbumScanView.swift in Sources */,
 				24BD0766FCBF271765CB3E44 /* AppleSignInButton.swift in Sources */,
 				178C1D2F419675454C2C0638 /* AskModel.swift in Sources */,
 				5A54C2BF4C4B9FE167736A02 /* AskPhotoImport.swift in Sources */,
