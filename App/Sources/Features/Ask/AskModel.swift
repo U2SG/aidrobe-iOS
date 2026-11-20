@@ -1,5 +1,6 @@
 import AidrobeKit
 import Foundation
+import UIKit
 
 struct AskGarment: Identifiable, Equatable {
     let id: String
@@ -80,6 +81,7 @@ final class AskModel {
 
     let outfitActions: TodayModel
     let packing: PackingModel
+    let photoImports: AskPhotoImportModel
     private let api: APIClient
     private let wardrobe: WardrobeStore
     private let bookmark: ConversationBookmark?
@@ -104,6 +106,7 @@ final class AskModel {
             api: api, wardrobe: wardrobe, onRevision: onRevision, onFavoritesChange: onFavoritesChange
         )
         packing = PackingModel(api: api)
+        photoImports = AskPhotoImportModel(api: api, wardrobe: wardrobe)
     }
 
     var isAsking: Bool {
@@ -128,6 +131,7 @@ final class AskModel {
     var usesInspiration: Bool { inspiration != nil || designConstraints?.inspirationId != nil }
     var hasConversation: Bool {
         !entries.isEmpty || styling != nil || designBrief != nil || baseOutfit != nil || usesInspiration
+            || !photoImports.batches.isEmpty
     }
     var expectedRevision: Int? { designBrief?.revision ?? styling?.revision }
     var needsOutfitUpdate: Bool { designBrief?.needsOutfitUpdate ?? false }
@@ -185,6 +189,16 @@ final class AskModel {
         )
         entries.append(entry)
         Task { await send(entry.id) }
+        return true
+    }
+
+    /// Photos sent with the message become wardrobe imports and the text their
+    /// note, not a question. Before the first answer there is no server
+    /// conversation, so those imports stay unlinked in this page only.
+    @discardableResult
+    func importPhotos(_ images: [UIImage], note: String) -> Bool {
+        guard !images.isEmpty, !isRestoring, accountGeneration == AccountLocalData.generation else { return false }
+        photoImports.send(images, note: note, conversationID: conversationID)
         return true
     }
 
@@ -338,6 +352,7 @@ final class AskModel {
         packingListID = nil
         purchaseDecisions = []
         purchaseRevision = UUID()
+        photoImports.reset()
         restoringID = nil
         restorationFailure = nil
         actionFailure = nil
@@ -411,6 +426,10 @@ final class AskModel {
                 }
             }
             entries = restored
+            photoImports.restore(
+                result.importTasks ?? [], at: restored.last?.createdAt ?? .now,
+                keepingLocal: previousConversationID == result.conversationId
+            )
             conversationID = result.conversationId
             baseOutfit = nil
             let sourceID = result.designBrief?.constraints.inspirationId ?? result.styling?.constraints.inspirationId

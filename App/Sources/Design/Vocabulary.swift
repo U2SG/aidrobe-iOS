@@ -70,6 +70,7 @@ enum Garment {
     static let materials: [(key: String, label: String)] = [
         ("cotton", "棉"), ("wool", "羊毛"), ("cashmere", "羊绒"), ("linen", "亚麻"), ("silk", "真丝"),
         ("denim", "牛仔"), ("leather", "皮革"), ("polyester", "聚酯纤维"), ("nylon", "尼龙"), ("down", "羽绒"),
+        ("knit", "针织"), ("suede", "麂皮"), ("fleece", "抓绒"), ("canvas", "帆布"), ("synthetic", "合成纤维"),
     ]
 
     static func material(_ raw: String) -> String {

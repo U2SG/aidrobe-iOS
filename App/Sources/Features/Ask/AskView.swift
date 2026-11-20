@@ -1,4 +1,5 @@
 import AidrobeKit
+import PhotosUI
 import SwiftUI
 
 /// Ask the wardrobe a question. Each question leads into the answer and the
@@ -20,6 +21,9 @@ struct AskView<Tools: View>: View {
     /// dragged by hand, because a jump near the end cannot always bring it to the top.
     @State private var pickedTurn: UUID?
     @State private var topInset: CGFloat = 0
+    @State private var pickerItems: [PhotosPickerItem] = []
+    /// Photos attached to the next message; sending imports them.
+    @State private var attachments: [AskAttachment] = []
     @FocusState private var isTyping: Bool
     private let tools: Tools
 
@@ -112,6 +116,7 @@ struct AskView<Tools: View>: View {
             }
             await model?.load()
         }
+        .task { await app.loadPreferencesIfNeeded() }
     }
 
     private func page(_ model: AskModel) -> some View {
@@ -161,6 +166,9 @@ struct AskView<Tools: View>: View {
                     case let .purchase(decision):
                         savedPurchase(decision, model: model)
                             .id(item.id)
+                    case let .importReview(batch):
+                        AskPhotoImportCard(model: model.photoImports, batchID: batch.id, showsPrice: app.tracksItemCosts)
+                            .id(item.id)
                     }
                 }
                 if model.shoppingSource != nil {
@@ -205,6 +213,9 @@ struct AskView<Tools: View>: View {
             if let id {
                 scrollPosition.scrollTo(id: AskScrollTarget.turn(id), anchor: .top)
             }
+        }
+        .onChange(of: model.photoImports.batches.last?.id) { _, id in
+            if let id { scrollPosition.scrollTo(id: AskScrollTarget.importReview(id), anchor: .top) }
         }
         .onChange(of: isTyping) { _, typing in
             if typing { showsCurrentOutfit = false }
@@ -264,6 +275,7 @@ struct AskView<Tools: View>: View {
         var items = model.entries.map(AskTimelineItem.turn)
         if let list = model.packingList { items.append(.packingList(list)) }
         items.append(contentsOf: model.purchaseDecisions.map(AskTimelineItem.purchase))
+        items.append(contentsOf: model.photoImports.batches.map(AskTimelineItem.importReview))
         let fallbackDate = model.entries.first?.createdAt ?? .distantPast
         return items.sorted {
             let left = $0.createdAt ?? fallbackDate
@@ -491,9 +503,26 @@ struct AskView<Tools: View>: View {
                     .font(.footnote)
                     .foregroundStyle(Color.secondaryLabel)
             }
+            if !attachments.isEmpty { attachmentStrip }
             GlassEffectContainer(spacing: Spacing.tight) {
                 HStack(alignment: .bottom, spacing: Spacing.tight) {
-                    TextField("说说想法，或调整这一套", text: $draft, axis: .vertical)
+                    PhotosPicker(
+                        selection: $pickerItems, maxSelectionCount: max(1, Self.maxAttachments - attachments.count),
+                        matching: .images
+                    ) {
+                        Image(systemName: "photo.badge.plus")
+                            .frame(width: 22, height: 22)
+                    }
+                    .buttonStyle(.glass)
+                    .buttonBorderShape(.circle)
+                    .controlSize(.large)
+                    .disabled(attachments.count >= Self.maxAttachments || model.isRestoring)
+                    .accessibilityLabel("从照片添加衣物")
+                    .accessibilityIdentifier("ask.attachPhotos")
+                    TextField(
+                        attachments.isEmpty ? "说说想法，或调整这一套" : "补充说明，比如只要外套、多少钱买的",
+                        text: $draft, axis: .vertical
+                    )
                         .accessibilityIdentifier("ask.message")
                         .lineLimit(1...4)
                         .focused($isTyping)
@@ -517,7 +546,7 @@ struct AskView<Tools: View>: View {
                     .buttonStyle(.glassProminent)
                     .buttonBorderShape(.circle)
                     .controlSize(.large)
-                    .disabled(!model.canAsk || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(!canSend(model))
                     .accessibilityLabel("发送")
                     .accessibilityIdentifier("ask.send")
                 }
@@ -525,9 +554,69 @@ struct AskView<Tools: View>: View {
         }
         .padding(.horizontal, Spacing.screen)
         .padding(.bottom, Spacing.tight)
+        .onChange(of: pickerItems) { _, items in
+            guard !items.isEmpty else { return }
+            pickerItems = []
+            Task { await attach(items) }
+        }
+    }
+
+    private static var maxAttachments: Int { 9 }
+
+    private var attachmentStrip: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: Spacing.tight) {
+                ForEach(attachments) { attachment in
+                    Image(uiImage: attachment.image)
+                        .resizable()
+                        .scaledToFill()
+                        .frame(width: 52, height: 52)
+                        .clipShape(.rect(cornerRadius: Radius.tile))
+                        .overlay(alignment: .topTrailing) {
+                            Button {
+                                attachments.removeAll { $0.id == attachment.id }
+                            } label: {
+                                Image(systemName: "xmark")
+                                    .font(.caption2.weight(.bold))
+                                    .frame(width: 18, height: 18)
+                            }
+                            .buttonStyle(.glass)
+                            .buttonBorderShape(.circle)
+                            .controlSize(.mini)
+                            .offset(x: 6, y: -6)
+                            .accessibilityLabel("移除这张照片")
+                        }
+                        .padding(.top, 6)
+                        .padding(.trailing, 6)
+                }
+            }
+        }
+        .scrollIndicators(.hidden)
+        .accessibilityIdentifier("ask.attachments")
+    }
+
+    private func attach(_ items: [PhotosPickerItem]) async {
+        for item in items {
+            guard attachments.count < Self.maxAttachments else { break }
+            if let data = try? await item.loadTransferable(type: Data.self), let image = UIImage(data: data) {
+                attachments.append(AskAttachment(image: image))
+            }
+        }
+    }
+
+    private func canSend(_ model: AskModel) -> Bool {
+        if !attachments.isEmpty { return !model.isRestoring }
+        return model.canAsk && !draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     private func send(_ question: String, _ model: AskModel) {
+        if !attachments.isEmpty {
+            guard model.importPhotos(attachments.map(\.image), note: question) else { return }
+            attachments = []
+            draft = ""
+            isTyping = false
+            return
+        }
         guard model.ask(question) else { return }
         if draft == question { draft = "" }
         isTyping = false
@@ -544,6 +633,11 @@ private struct AskPackingRoute: Hashable {
     let listID: String
 }
 
+private struct AskAttachment: Identifiable {
+    let id = UUID()
+    let image: UIImage
+}
+
 private struct AskShoppingPresentation: Identifiable {
     let id = UUID()
     let source: ShoppingDesignSource?
@@ -556,18 +650,21 @@ private enum AskScrollTarget: Hashable, Sendable {
     case turn(UUID)
     case packingList(String)
     case purchase(String)
+    case importReview(UUID)
 }
 
 private enum AskTimelineItem: Identifiable {
     case turn(AskModel.Entry)
     case packingList(Wire.PackingListResponse)
     case purchase(Wire.WardrobeDecisionResponse)
+    case importReview(AskPhotoImportModel.Batch)
 
     var id: AskScrollTarget {
         switch self {
         case let .turn(entry): .turn(entry.id)
         case let .packingList(list): .packingList(list.packingListId)
         case let .purchase(decision): .purchase(decision.id)
+        case let .importReview(batch): .importReview(batch.id)
         }
     }
 
@@ -576,6 +673,7 @@ private enum AskTimelineItem: Identifiable {
         case let .turn(entry): entry.createdAt
         case let .packingList(list): list.createdAt
         case let .purchase(decision): decision.createdAt
+        case let .importReview(batch): batch.createdAt
         }
     }
 
@@ -585,6 +683,7 @@ private enum AskTimelineItem: Identifiable {
         case let .turn(entry): "0-\(entry.id)"
         case let .packingList(list): "1-\(list.packingListId)"
         case let .purchase(decision): "2-\(decision.id)"
+        case let .importReview(batch): "3-\(batch.id)"
         }
     }
 }
