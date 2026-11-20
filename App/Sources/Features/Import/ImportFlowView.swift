@@ -15,6 +15,8 @@ struct ImportFlowView: View {
     @State private var inputType: Endpoints.ImportInputType = .image
     @State private var openingJob: UUID?
     @State private var confirming: ConfirmTarget?
+    /// "「我的穿搭」里有 N 张新照片" for the remembered scan album.
+    @State private var albumPrompt: (text: String, action: String)?
 
     /// Called after at least one item was added, so the caller can refresh.
     var onImported: () -> Void = {}
@@ -46,6 +48,19 @@ struct ImportFlowView: View {
                             showCamera = true
                         } label: {
                             Label("拍一张", systemImage: "camera")
+                        }
+                    }
+                    NavigationLink {
+                        AlbumScanView(onImported: onImported)
+                    } label: {
+                        if let albumPrompt {
+                            LabeledContent {
+                                Text(albumPrompt.action)
+                            } label: {
+                                Label(albumPrompt.text, systemImage: "rectangle.stack.badge.plus")
+                            }
+                        } else {
+                            Label("扫描相册", systemImage: "rectangle.stack")
                         }
                     }
                 } footer: {
@@ -99,6 +114,10 @@ struct ImportFlowView: View {
             .scrollContentBackground(.hidden)
             .background(Color.groupedBackground)
             .navigationTitle("添加衣物")
+            .onAppear {
+                // Also on coming back from the scan page.
+                Task { albumPrompt = await Self.albumPrompt() }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) {
@@ -129,7 +148,9 @@ struct ImportFlowView: View {
             await model?.loadPending()
         }
         .onChange(of: scenePhase) { _, phase in
-            if phase == .active { Task { await model?.loadPending() } }
+            guard phase == .active else { return }
+            Task { await model?.loadPending() }
+            Task { albumPrompt = await Self.albumPrompt() }
         }
     }
 
@@ -140,6 +161,14 @@ struct ImportFlowView: View {
         return count < Season.starterCount
             ? "\(season)能穿的已录 \(count) 件，录到 \(Season.starterCount) 件左右就够天天搭了。"
             : "\(season)能穿的已录 \(count) 件。"
+    }
+
+    /// Foreground only: new photos in the remembered album, or a scan waiting for review.
+    private static func albumPrompt() async -> (text: String, action: String)? {
+        if AlbumScanModel.hasPendingReview { return ("相册扫描结果待确认", "查看") }
+        let unseen = await Task.detached { AlbumScanModel.unseenInRememberedAlbum() }.value
+        guard let unseen, unseen.count > 0 else { return nil }
+        return ("「\(unseen.title)」里有 \(unseen.count) 张新照片", "扫描")
     }
 
     private func openReview(_ job: ImportFlowModel.Job, model: ImportFlowModel) {
