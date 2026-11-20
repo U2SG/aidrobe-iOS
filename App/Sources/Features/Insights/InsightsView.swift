@@ -34,7 +34,9 @@ struct InsightsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if model == nil { model = InsightsModel(api: app.api, wardrobe: app.wardrobe) }
+            async let preferences: Void = app.loadPreferencesIfNeeded()
             await model?.load()
+            await preferences
         }
     }
 
@@ -54,7 +56,7 @@ struct InsightsView: View {
                 mostWorn(model)
                 resting(model, thresholdDays: summary.idleThresholdDays)
                 palette(model)
-                costPerWear(model)
+                if app.tracksItemCosts { costPerWear(model) }
             }
             .padding(Spacing.screen)
         }

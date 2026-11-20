@@ -117,13 +117,15 @@ struct ItemDetailView: View {
                     if let seasons = Garment.seasons(item.seasonTags) {
                         FactRow(title: "季节") { Text(seasons) }
                     }
-                    FactRow(title: "买时价格") {
-                        Button(item.purchasePrice.map(Garment.price) ?? "添加价格") {
-                            editsPrice = true
-                            isEditing = true
+                    if app.tracksItemCosts {
+                        FactRow(title: "买时价格") {
+                            Button(item.purchasePrice.map(Garment.price) ?? "添加价格") {
+                                editsPrice = true
+                                isEditing = true
+                            }
+                            .foregroundStyle(item.purchasePrice == nil ? Color.accent : Color.label)
+                            .frame(minHeight: 44)
                         }
-                        .foregroundStyle(item.purchasePrice == nil ? Color.accent : Color.label)
-                        .frame(minHeight: 44)
                     }
                     if let material = item.material, !material.isEmpty {
                         FactRow(title: "材质") { Text(Garment.material(material)) }
@@ -187,6 +189,7 @@ struct ItemDetailView: View {
         .task(id: item.cutoutStatus) {
             if item.cutoutStatus == "queued" { await store.refreshProductImage(item.itemId) }
         }
+        .task { await app.loadPreferencesIfNeeded() }
         .confirmationDialog("移除「\(item.displayName)」？", isPresented: $confirmsDelete, titleVisibility: .visible) {
             Button("移除", role: .destructive) {
                 Task {
@@ -431,7 +434,7 @@ private struct ItemEditSheet: View {
                              : "确认名称、分类和颜色后保存。")
                     }
                 }
-                if recognition == nil {
+                if recognition == nil, app.tracksItemCosts {
                     Section {
                         HStack {
                             Text("买时价格")
@@ -492,7 +495,10 @@ private struct ItemEditSheet: View {
 
     /// nil leaves the stored price as it is (the backend has no way to clear it).
     private var parsedPrice: Double? {
-        Double(price.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: "."))
+        let text = price.trimmingCharacters(in: .whitespaces)
+        // Parse with the locale the field was formatted in (localized digits, decimal separator), then plain ASCII.
+        return (try? Double(text, format: .number.grouping(.never)))
+            ?? Double(text.replacingOccurrences(of: ",", with: "."))
     }
 
     private var priceIsValid: Bool {

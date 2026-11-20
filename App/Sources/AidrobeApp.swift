@@ -41,6 +41,9 @@ final class AppModel {
     private(set) var todayChange = UUID()
     private(set) var favoritesChange = UUID()
     var selectedTab: AppTab = .today
+    /// Opt-in account setting: show purchase prices and cost per wear. Off until loaded.
+    private(set) var tracksItemCosts = false
+    private var preferencesGeneration: UUID?
     var outfitToDiscuss: Wire.OutfitResponse?
     var inspirationToDiscuss: Wire.InspirationResponse?
     var conversationToDiscuss: String?
@@ -90,6 +93,28 @@ final class AppModel {
         askNavigationChange = UUID()
         stylingChange = UUID()
         selectedTab = .ask
+    }
+
+    /// Loads account-level display preferences once per signed-in account.
+    func loadPreferencesIfNeeded() async {
+        let generation = AccountLocalData.generation
+        guard preferencesGeneration != generation,
+              let settings = try? await api.send(Endpoints.settings()),
+              generation == AccountLocalData.generation else { return }
+        preferencesGeneration = generation
+        tracksItemCosts = settings.trackItemCosts ?? false
+    }
+
+    /// Optimistic; reverts when the server refuses.
+    func setTracksItemCosts(_ on: Bool) async {
+        let previous = tracksItemCosts
+        tracksItemCosts = on
+        do {
+            let settings = try await api.send(Endpoints.updateSettings(.init(trackItemCosts: on)))
+            tracksItemCosts = settings.trackItemCosts ?? on
+        } catch {
+            tracksItemCosts = previous
+        }
     }
 
     private static let onboardingKey = "aidrobe.onboarding.completed"
