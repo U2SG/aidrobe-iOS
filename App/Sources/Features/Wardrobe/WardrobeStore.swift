@@ -19,6 +19,12 @@ final class WardrobeStore {
         items.contains { $0.cutoutStatus == "queued" }
     }
 
+    /// Pieces that suit the season now (untagged ones count), as the backend picks them.
+    var inSeasonCount: Int {
+        let season = Season.current()
+        return items.count { Season.contains($0.seasonTags, season) }
+    }
+
     private let api: APIClient
     private static let pageSize = 100
     private var loadID = UUID()

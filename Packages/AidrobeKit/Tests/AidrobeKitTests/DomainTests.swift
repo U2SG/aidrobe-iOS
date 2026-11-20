@@ -1,4 +1,5 @@
 @testable import AidrobeKit
+import Foundation
 import Testing
 
 @Suite struct OutfitBoardLayoutTests {
@@ -100,5 +101,23 @@ import Testing
     @Test func warmthIsClamped() {
         #expect(visual("晴", temp: -10).warmth == 0)
         #expect(visual("晴", temp: 40).warmth == 1)
+    }
+}
+
+@Suite struct SeasonTests {
+    @Test(arguments: [(1, "winter"), (3, "spring"), (5, "spring"), (6, "summer"), (8, "summer"), (9, "autumn"), (11, "autumn"), (12, "winter")])
+    func monthMapsToTheBackendSeason(month: Int, season: String) throws {
+        var calendar = Calendar(identifier: .gregorian)
+        calendar.timeZone = try #require(TimeZone(identifier: "Asia/Shanghai"))
+        let date = try #require(calendar.date(from: DateComponents(year: 2026, month: month, day: 15)))
+        #expect(Season.current(on: date, calendar: calendar) == season)
+    }
+
+    @Test func untaggedAndAllSeasonGarmentsAlwaysCount() {
+        #expect(Season.contains(nil, "winter"))
+        #expect(Season.contains([], "winter"))
+        #expect(Season.contains(["all_season"], "winter"))
+        #expect(Season.contains(["autumn", "winter"], "winter"))
+        #expect(!Season.contains(["summer"], "winter"))
     }
 }

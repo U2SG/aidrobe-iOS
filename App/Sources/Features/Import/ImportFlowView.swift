@@ -49,7 +49,12 @@ struct ImportFlowView: View {
                         }
                     }
                 } footer: {
-                    Text(inputType == .outfitImage ? "从一张穿搭照里识别多件衣物。" : "每张照片识别一件衣物。")
+                    VStack(alignment: .leading, spacing: Spacing.tight) {
+                        Text(inputType == .outfitImage ? "从一张穿搭照里识别多件衣物。" : "每张照片识别一件衣物。")
+                        if app.wardrobe.phase == .loaded {
+                            Text(seasonProgress)
+                        }
+                    }
                 }
 
                 if let model {
@@ -126,6 +131,15 @@ struct ImportFlowView: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await model?.loadPending() } }
         }
+    }
+
+    /// How far this season's pieces are; only nudges until the starter set is in.
+    private var seasonProgress: String {
+        let count = app.wardrobe.inSeasonCount
+        let season = Garment.seasonName(Season.current())
+        return count < Season.starterCount
+            ? "\(season)能穿的已录 \(count) 件，录到 \(Season.starterCount) 件左右就够天天搭了。"
+            : "\(season)能穿的已录 \(count) 件。"
     }
 
     private func openReview(_ job: ImportFlowModel.Job, model: ImportFlowModel) {
