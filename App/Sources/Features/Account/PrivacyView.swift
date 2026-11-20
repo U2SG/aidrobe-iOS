@@ -18,6 +18,7 @@ struct PrivacyView: View {
     }
 
     private let facts = [
+        ("存在云端", "衣橱、照片和穿着记录都存在你的账号里，不只在这台手机上。换新手机用同一个 Apple 账号登录，就会原样回来。"),
         ("衣物照片", "原图存在你的账号下，不会被替换或重画。"),
         ("去背景", "在手机上完成，照片不会为此上传。"),
         ("穿着与反馈", "只用来给你搭配，记住了什么都能在「记住的偏好」里看到。"),
@@ -87,7 +88,7 @@ struct PrivacyView: View {
     private var exportSection: some View {
         VStack(alignment: .leading, spacing: Spacing.control) {
             SectionHeading(title: "带走")
-            Text("把衣物、穿着记录和偏好打包成一份文件。")
+            Text("把账号设置、每件衣物的资料（名称、分类、颜色、季节、价格等）和穿着记录打包成一份 JSON 文件。照片不在文件里，仍存在你的账号下。")
                 .font(.subheadline)
                 .foregroundStyle(Color.secondaryLabel)
             switch export {
