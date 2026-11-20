@@ -263,7 +263,7 @@ final class AlbumScanModel {
                 return .init(
                     groupId: group.groupId, action: .create,
                     title: draft.title.trimmingCharacters(in: .whitespacesAndNewlines),
-                    category: draft.category, colorMain: draft.color
+                    category: draft.category, colorMain: draft.color, backfillWear: draft.backfill
                 )
             case .link:
                 return .init(groupId: group.groupId, action: .link, backfillWear: draft.backfill)
