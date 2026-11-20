@@ -38,7 +38,9 @@ struct ProfileView: View {
         .toast(Binding(get: { model?.notice }, set: { model?.notice = $0 }))
         .task {
             if model == nil { model = ProfileModel(api: app.api) }
+            async let preferences: Void = app.loadPreferencesIfNeeded()
             await model?.load()
+            await preferences
         }
     }
 
@@ -97,6 +99,16 @@ struct ProfileView: View {
             NavigationLink("风格灵感") { StyleInspirationView() }
             NavigationLink("记住的偏好") { MemoryView() }
             NavigationLink("数据与隐私") { PrivacyView() }
+        }
+        Section {
+            Toggle("记录价格和每次穿着成本", isOn: Binding(
+                get: { app.tracksItemCosts },
+                set: { on in Task { await app.setTracksItemCosts(on) } }
+            ))
+        } header: {
+            Text("可选功能")
+        } footer: {
+            Text("打开后，单品页可以记买时价格，衣橱洞察会算出每穿一次多少钱。")
         }
     }
 

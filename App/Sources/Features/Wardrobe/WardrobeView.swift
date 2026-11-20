@@ -70,7 +70,7 @@ struct WardrobeView: View {
                     ContentUnavailableView {
                         Label("衣橱还是空的", systemImage: "hanger")
                     } description: {
-                        Text("放进一件上装、一件下装和一双鞋，就能搭出第一套。")
+                        Text("放进一件上装、一件下装和一双鞋，就能搭出第一套。不用一次录完，先放这一季能穿的 \(Season.starterCount) 件左右就够用了。")
                     } actions: {
                         Button("添加衣物") { isImporting = true }
                             .buttonStyle(.glassProminent)
@@ -113,6 +113,12 @@ struct WardrobeView: View {
                     .controlSize(.regular)
                 }
                 .padding(.horizontal, Spacing.screen)
+                if activeFilters == 0, store.inSeasonCount < Season.starterCount {
+                    Text("\(Garment.seasonName(Season.current()))能穿的有 \(store.inSeasonCount) 件。不用一次录完，先补到 \(Season.starterCount) 件左右就够天天搭了。")
+                        .font(.footnote)
+                        .foregroundStyle(Color.tertiaryLabel)
+                        .padding(.horizontal, Spacing.screen)
+                }
                 ScrollView(.horizontal) {
                     HStack(spacing: Spacing.tight) {
                         Chip(title: "全部", isSelected: category == nil) { category = nil }

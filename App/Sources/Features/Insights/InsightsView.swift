@@ -34,7 +34,9 @@ struct InsightsView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             if model == nil { model = InsightsModel(api: app.api, wardrobe: app.wardrobe) }
+            async let preferences: Void = app.loadPreferencesIfNeeded()
             await model?.load()
+            await preferences
         }
     }
 
@@ -54,7 +56,7 @@ struct InsightsView: View {
                 mostWorn(model)
                 resting(model, thresholdDays: summary.idleThresholdDays)
                 palette(model)
-                costPerWear(model)
+                if app.tracksItemCosts { costPerWear(model) }
             }
             .padding(Spacing.screen)
         }
@@ -209,8 +211,10 @@ struct InsightsView: View {
         VStack(alignment: .leading, spacing: 0) {
             SectionHeading(title: "每穿一次多少钱")
                 .padding(.bottom, 4)
-            if model.costs.isEmpty {
-                note("给衣服记上买入价格并穿过之后，这里会算出每穿一次的花费，越常穿越划算。")
+            if model.costs.isEmpty, !app.wardrobe.items.contains(where: { $0.purchasePrice != nil }) {
+                note("衣橱里还没有记过价格。打开一件衣服，在「买时价格」里补上，穿过之后这里会算出每穿一次多少钱。")
+            } else if model.costs.isEmpty {
+                note("记了价格的衣服穿过之后，这里会算出每穿一次的花费，越常穿越划算。")
             } else {
                 ForEach(model.costs.prefix(5), id: \.itemId) { item in
                     itemRow(model, id: item.itemId, title: item.title, cover: nil) {

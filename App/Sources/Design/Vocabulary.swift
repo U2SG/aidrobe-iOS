@@ -93,6 +93,16 @@ enum Garment {
         return labels.isEmpty ? nil : labels.joined(separator: " · ")
     }
 
+    /// "¥299" or "¥89.5".
+    static func price(_ value: Double) -> String {
+        "¥" + value.formatted(.number.precision(.fractionLength(0...2)))
+    }
+
+    /// "秋天" for `autumn`.
+    static func seasonName(_ key: String) -> String {
+        (seasonOptions.first { $0.key == key }?.label ?? "这一季") + "天"
+    }
+
     /// Recognition scores formality 0…100 (10 sport … 90 formal). Smaller
     /// values are the legacy 1…5 edit scale and are not shown.
     static func formality(_ score: Int?) -> String? {

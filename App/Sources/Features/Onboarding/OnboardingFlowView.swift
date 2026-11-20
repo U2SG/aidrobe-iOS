@@ -83,6 +83,13 @@ private struct ClothesStep: View {
 
     private var isEnough: Bool { slots.allSatisfy { $0.count > 0 } }
 
+    /// Cataloguing everything at once is what wears people out: a season's worth is enough to start.
+    private var progress: String {
+        let advice = "不用一次录完，先放这一季能穿的 \(Season.starterCount) 件左右就够用了。"
+        let items = app.wardrobe.items
+        return items.isEmpty ? advice : "衣橱里现在有 \(items.count) 件。" + advice
+    }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             StepHeading(
@@ -109,12 +116,10 @@ private struct ClothesStep: View {
                 }
                 Divider().overlay(Color.separator)
             }
-            if !app.wardrobe.items.isEmpty {
-                Text("衣橱里现在有 \(app.wardrobe.items.count) 件")
-                    .font(.footnote)
-                    .foregroundStyle(Color.tertiaryLabel)
-                    .padding(.top, Spacing.control)
-            }
+            Text(progress)
+                .font(.footnote)
+                .foregroundStyle(Color.tertiaryLabel)
+                .padding(.top, Spacing.control)
             Spacer(minLength: Spacing.section)
             VStack(spacing: Spacing.control) {
                 if isEnough {

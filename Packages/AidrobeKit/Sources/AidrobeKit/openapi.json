@@ -12847,6 +12847,10 @@
        "less_outdoor"
       ],
       "title": "Commute Exposure"
+     },
+     "track_item_costs": {
+      "type": "boolean",
+      "title": "Track Item Costs"
      }
     },
     "type": "object",
@@ -12984,6 +12988,11 @@
        "less_outdoor"
       ],
       "title": "Commute Exposure"
+     },
+     "track_item_costs": {
+      "type": "boolean",
+      "title": "Track Item Costs",
+      "default": false
      }
     },
     "type": "object",
