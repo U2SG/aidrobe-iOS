@@ -17,6 +17,12 @@ struct WelcomeView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
             Spacer(minLength: Spacing.section)
+            Image("BrandMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 64, height: 64)
+                .accessibilityHidden(true)
+                .padding(.bottom, Spacing.row)
             Text("衣然")
                 .font(.display(64, weight: .black, relativeTo: .largeTitle))
                 .foregroundStyle(Color.label)

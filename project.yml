@@ -44,6 +44,7 @@ targets:
         CFBundleLocalizations: [zh-Hans]
         UILaunchScreen:
           UIColorName: Background
+          UIImageName: BrandMark
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         ITSAppUsesNonExemptEncryption: false
         NSCameraUsageDescription: 拍摄衣物照片，导入你的衣橱。
