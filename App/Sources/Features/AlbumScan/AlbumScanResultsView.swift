@@ -129,7 +129,12 @@ private struct GroupRow: View {
     private var header: some View {
         HStack(alignment: .top, spacing: Spacing.control) {
             Button(action: showSources) {
-                GarmentImage(url: group.bestCropUrl.flatMap(URL.init(string:)), forceOriginal: true, fit: true)
+                // No crop (too small to cut out): show the source photo rather than an empty tile.
+                GarmentImage(
+                    url: (group.bestCropUrl ?? group.members.lazy.compactMap(\.photoUrl).first)
+                        .flatMap(URL.init(string:)),
+                    forceOriginal: true, fit: true
+                )
                     .frame(width: 72, height: 72)
             }
             .buttonStyle(.plain)
@@ -159,6 +164,7 @@ private struct GroupRow: View {
         case .new:
             Toggle("加入衣橱", isOn: choiceBinding(on: .create))
             if draft.choice == .create { editor }
+            backfill
         case .existing:
             Text("这是你的〈\(group.existingItem?.title ?? group.title)〉吗？")
                 .foregroundStyle(Color.label)
@@ -179,13 +185,15 @@ private struct GroupRow: View {
                 Toggle("要加入衣橱吗？", isOn: choiceBinding(on: .create))
             }
             if draft.choice == .create { editor }
+            if group.existingItem == nil { backfill }
         }
     }
 
     @ViewBuilder
     private var backfill: some View {
         let dates = group.wearDates ?? []
-        if draft.choice == .link, !dates.isEmpty {
+        // A photo shows the garment was worn that day, for a new garment as much as a known one.
+        if draft.choice == .link || draft.choice == .create, !dates.isEmpty {
             Toggle(AlbumScan.backfillLabel(dates), isOn: $draft.backfill)
                 .font(.subheadline)
         }
