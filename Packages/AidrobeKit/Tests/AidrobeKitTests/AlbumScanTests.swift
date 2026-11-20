@@ -57,6 +57,26 @@ import Testing
         #expect(AlbumScan.day(of: taken.addingTimeInterval(10 * 86_400), today: taken, calendar: calendar) == "2026-11-03")
     }
 
+    @Test func dayIsGregorianWhateverTheUserCalendar() throws {
+        var buddhist = Calendar(identifier: .buddhist)
+        buddhist.locale = Locale(identifier: "th_TH")
+        buddhist.timeZone = try #require(TimeZone(identifier: "Asia/Bangkok"))
+        // 2026-11-02 18:30 UTC is 11-03 01:30 in Bangkok; Buddhist year 2569.
+        let taken = Date(timeIntervalSince1970: 1_793_644_200)
+        #expect(AlbumScan.day(of: taken, today: taken, calendar: buddhist) == "2026-11-03")
+        var chinese = Calendar(identifier: .chinese)
+        chinese.timeZone = buddhist.timeZone
+        #expect(AlbumScan.day(of: taken, today: taken, calendar: chinese) == "2026-11-03")
+    }
+
+    @Test func unreadablePhotosAreRetriedNextRun() {
+        var ledger = AlbumScan.Ledger()
+        ledger.skip("cloud", .unreadable)
+        #expect(ledger.processed.isEmpty)
+        #expect(ledger.lastTally.skipped[.unreadable] == 1)
+        #expect(AlbumScan.nextRun(newestFirst: ["cloud"], processed: ledger.processed, reinclude: ledger.reinclude) == ["cloud"])
+    }
+
     @Test func backfillLabelListsShortDays() {
         #expect(AlbumScan.shortDay("2026-11-03") == "11/3")
         #expect(AlbumScan.backfillLabel(["2026-11-03", "2026-11-09", "2026-11-15"])

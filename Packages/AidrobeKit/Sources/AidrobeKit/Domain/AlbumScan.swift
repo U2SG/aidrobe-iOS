@@ -47,6 +47,10 @@ public enum AlbumScan {
             case .screenshot, .video, .tooSmall, .unreadable: false
             }
         }
+
+        /// A photo that could not be read (an iCloud download failed) is tried
+        /// again next run instead of being marked as seen.
+        public var isTransient: Bool { self == .unreadable }
     }
 
     /// The photos to look at this run: not seen before, newest first. Photos the
@@ -148,9 +152,13 @@ public enum AlbumScan {
     // MARK: Dates
 
     /// The photo's local calendar day as `YYYY-MM-DD`, never later than today
-    /// (a wrong camera clock must not log a wear in the future).
+    /// (a wrong camera clock must not log a wear in the future). Always
+    /// Gregorian in the given calendar's time zone: a Buddhist or Chinese user
+    /// calendar would otherwise send the wrong year.
     public static func day(of date: Date, today: Date = .now, calendar: Calendar = .current) -> String {
-        let parts = calendar.dateComponents([.year, .month, .day], from: min(date, today))
+        var gregorian = Calendar(identifier: .gregorian)
+        gregorian.timeZone = calendar.timeZone
+        let parts = gregorian.dateComponents([.year, .month, .day], from: min(date, today))
         return String(format: "%04d-%02d-%02d", parts.year ?? 0, parts.month ?? 0, parts.day ?? 0)
     }
 
@@ -221,9 +229,10 @@ public enum AlbumScan {
         }
 
         public mutating func skip(_ id: String, _ reason: SkipReason) {
+            lastSkipped[id] = reason
+            guard !reason.isTransient else { return }
             processed.insert(id)
             reinclude.remove(id)
-            lastSkipped[id] = reason
         }
 
         public mutating func done(_ id: String) {

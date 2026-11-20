@@ -25,7 +25,7 @@ struct AlbumScanView: View {
         .toast(Binding(get: { model?.notice }, set: { model?.notice = $0 }))
         .task {
             if model == nil {
-                let created = AlbumScanModel(api: app.api)
+                let created = app.albumScan()
                 model = created
                 await created.start()
             }
@@ -67,7 +67,7 @@ struct AlbumScanView: View {
             ContentUnavailableView {
                 Label(message, systemImage: "exclamationmark.triangle")
             } actions: {
-                Button("重新扫描") { Task { await model.scan() } }
+                Button("重新扫描") { model.startScan() }
             }
         }
     }
@@ -122,7 +122,7 @@ struct AlbumScanView: View {
             Section {
                 ForEach(albums) { album in
                     Button {
-                        Task { await model.scan(album) }
+                        model.startScan(album)
                     } label: {
                         HStack {
                             Text(album.title).foregroundStyle(Color.label)
@@ -154,7 +154,7 @@ struct AlbumScanView: View {
                         .foregroundStyle(Color.secondaryLabel)
                 }
                 Button(unseen > AlbumScan.photosPerRun ? "扫描最新的 \(AlbumScan.photosPerRun) 张" : "开始扫描") {
-                    Task { await model.scan() }
+                    model.startScan()
                 }
                 .disabled(unseen == 0)
                 Button("换一个相册") { model.chooseAnotherAlbum() }

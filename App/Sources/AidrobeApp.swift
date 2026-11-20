@@ -44,6 +44,9 @@ final class AppModel {
     /// Opt-in account setting: show purchase prices and cost per wear. Off until loaded.
     private(set) var tracksItemCosts = false
     private var preferencesGeneration: UUID?
+    /// One album scan per signed-in account: its uploads keep going (and stay
+    /// visible) when the page closes, and stop at sign-out.
+    private var albumScanModel: AlbumScanModel?
     var outfitToDiscuss: Wire.OutfitResponse?
     var inspirationToDiscuss: Wire.InspirationResponse?
     var conversationToDiscuss: String?
@@ -142,7 +145,16 @@ final class AppModel {
         onboardingCompleted = true
     }
 
+    func albumScan() -> AlbumScanModel {
+        if let model = albumScanModel { return model }
+        let model = AlbumScanModel(api: api)
+        albumScanModel = model
+        return model
+    }
+
     func signOut() {
+        albumScanModel?.cancel()
+        albumScanModel = nil
         tokens.clear()
         wardrobe.reset()
         AccountLocalData.clear()

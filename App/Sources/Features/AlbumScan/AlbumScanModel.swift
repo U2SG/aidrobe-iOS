@@ -47,6 +47,11 @@ final class AlbumScanModel {
     private let api: APIClient
     private let uploader: PresignedUploader
     private let accountGeneration = AccountLocalData.generation
+    /// The running scan (screening + uploads); outlives the page, cancelled at sign-out.
+    private var work: Task<Void, Never>?
+
+    /// Requests go out with whoever is signed in now; never send one account's photos to another.
+    private var isCurrentAccount: Bool { accountGeneration == AccountLocalData.generation }
 
     init(api: APIClient) {
         self.api = api
@@ -81,6 +86,8 @@ final class AlbumScanModel {
     // MARK: Flow
 
     func start() async {
+        // Reopened while a scan runs: keep showing its progress.
+        guard work == nil, isCurrentAccount else { return }
         if ledger.pendingBatchID != nil { return phase = .recognising(nil) }
         // Scanning needs the whole library: limited access can't see a chosen album.
         var status = PHPhotoLibrary.authorizationStatus(for: .readWrite)
@@ -101,7 +108,21 @@ final class AlbumScanModel {
         phase = .notice
     }
 
-    func scan(_ album: AlbumInfo) async {
+    /// Starts one scan unless one is already running.
+    func startScan(_ album: AlbumInfo? = nil) {
+        guard work == nil, isCurrentAccount else { return }
+        work = Task {
+            if let album { await scan(album) } else { await scan() }
+            work = nil
+        }
+    }
+
+    func cancel() {
+        work?.cancel()
+        work = nil
+    }
+
+    private func scan(_ album: AlbumInfo) async {
         if ledger.albumID != album.id {
             ledger.albumID = album.id
             ledger.albumTitle = album.title
@@ -111,7 +132,7 @@ final class AlbumScanModel {
     }
 
     /// One run: screen up to 60 unseen photos, upload the rest as a new batch.
-    func scan() async {
+    private func scan() async {
         guard let albumID = ledger.albumID, let ids = AlbumLibrary.assetIDs(in: albumID) else {
             return phase = .notice
         }
@@ -130,6 +151,7 @@ final class AlbumScanModel {
                 }
             }
         }.value
+        guard isCurrentAccount, !Task.isCancelled else { return }
         visionUnavailable = result.visionUnavailable
         for skip in result.skipped { ledger.skip(skip.id, skip.reason) }
         save()
@@ -137,10 +159,10 @@ final class AlbumScanModel {
         await upload(result.kept)
     }
 
+    /// The batch id is saved only once a photo is on the server, so reopening
+    /// the page polls a batch that exists; until then the running task owns it.
     private func upload(_ photos: [ScreenedPhoto]) async {
         let batchID = UUID().uuidString.lowercased()
-        ledger.pendingBatchID = batchID
-        save()
         phase = .uploading(done: 0, total: photos.count)
         var done = 0
         var sent = 0
@@ -150,8 +172,10 @@ final class AlbumScanModel {
                 guard let photo = queue.next() else { return }
                 group.addTask { [api, uploader] in
                     do {
+                        guard await self.mayContinue() else { return (photo.id, false) }
                         let key = UUID().uuidString
                         let upload = try await uploader.upload(photo.jpeg, fileName: "\(key).jpg", contentType: "image/jpeg")
+                        guard await self.mayContinue() else { return (photo.id, false) }
                         _ = try await api.send(Endpoints.createImport(
                             imageURL: upload.fileURL.absoluteString, inputType: .outfitImage, source: .album,
                             idempotencyKey: key, batchID: batchID, takenAt: photo.day
@@ -164,10 +188,13 @@ final class AlbumScanModel {
             }
             for _ in 0..<3 { next() }
             for await (id, ok) in group {
+                guard mayContinue() else { continue }
                 done += 1
                 if ok {
                     sent += 1
                     ledger.done(id)
+                    if ledger.pendingBatchID == nil { ledger.pendingBatchID = batchID }
+                    save()
                 } else {
                     uploadFailures += 1
                 }
@@ -175,20 +202,17 @@ final class AlbumScanModel {
                 next()
             }
         }
-        guard accountGeneration == AccountLocalData.generation else { return }
-        if sent == 0 {
-            ledger.pendingBatchID = nil
-            save()
-            return phase = .failed("照片没能上传，请检查网络后再试")
-        }
-        save()
+        guard mayContinue() else { return }
+        guard sent > 0 else { return phase = .failed("照片没能上传，请检查网络后再试") }
         phase = .recognising(nil)
     }
+
+    private func mayContinue() -> Bool { isCurrentAccount && !Task.isCancelled }
 
     /// Polls every 4 s while the page is open; the backend compares garments in the background.
     func waitForResults() async {
         guard let batchID = ledger.pendingBatchID else { return }
-        while !Task.isCancelled {
+        while mayContinue() {
             do {
                 let batch = try await api.send(Endpoints.importBatch(batchID))
                 if batch.complete {
@@ -231,6 +255,7 @@ final class AlbumScanModel {
 
     /// Returns true when the wardrobe changed.
     func confirm(_ batch: Wire.ImportBatchResponse) async -> Bool {
+        guard isCurrentAccount else { return false }
         let decisions: [Wire.ImportBatchGroupDecision] = batch.groups.compactMap { group in
             guard group.status != .confirmed, let draft = drafts[group.groupId] else { return nil }
             switch draft.choice {
